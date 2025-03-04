@@ -2,14 +2,13 @@ package server
 
 import (
 	"fmt"
+	"maya-canteen/internal/database"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
 	_ "github.com/joho/godotenv/autoload"
-
-	"maya-canteen/internal/database"
 )
 
 type Server struct {

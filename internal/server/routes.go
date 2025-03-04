@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"log"
+	"maya-canteen/internal/handlers"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
@@ -14,9 +15,24 @@ func (s *Server) RegisterRoutes() http.Handler {
 	// Wrap all routes with CORS middleware
 	corsWrapper := s.corsMiddleware(r)
 
-	r.HandlerFunc(http.MethodGet, "/", s.HelloWorldHandler)
+	// Initialize database tables
+	if err := s.db.InitTaskTable(); err != nil {
+		log.Fatal(err)
+	}
 
+	// Create handlers
+	taskHandler := handlers.NewTaskHandler(s.db)
+
+	// Register routes
+	r.HandlerFunc(http.MethodGet, "/", s.HelloWorldHandler)
 	r.HandlerFunc(http.MethodGet, "/health", s.healthHandler)
+
+	// Task routes
+	r.GET("/api/tasks", taskHandler.GetAllTasks)
+	r.GET("/api/tasks/:id", taskHandler.GetTask)
+	r.POST("/api/tasks", taskHandler.CreateTask)
+	r.PUT("/api/tasks/:id", taskHandler.UpdateTask)
+	r.DELETE("/api/tasks/:id", taskHandler.DeleteTask)
 
 	return corsWrapper
 }
@@ -54,7 +70,6 @@ func (s *Server) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResp, err := json.Marshal(s.db.Health())
-
 	if err != nil {
 		log.Fatalf("error handling JSON marshal. Err: %v", err)
 	}

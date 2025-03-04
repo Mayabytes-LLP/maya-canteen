@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"maya-canteen/internal/server"
 	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"maya-canteen/internal/server"
 )
 
 func gracefulShutdown(apiServer *http.Server, done chan bool) {
@@ -37,7 +36,6 @@ func gracefulShutdown(apiServer *http.Server, done chan bool) {
 }
 
 func main() {
-
 	server := server.NewServer()
 
 	// Create a done channel to signal when the shutdown is complete
