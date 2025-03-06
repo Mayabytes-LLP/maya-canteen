@@ -2,14 +2,18 @@ package server
 
 import (
 	"io"
+	"maya-canteen/internal/server/routes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestHandler(t *testing.T) {
-	s := &Server{}
-	server := httptest.NewServer(http.HandlerFunc(s.HelloWorldHandler))
+	// Create a system handler directly
+	systemHandlers := routes.NewSystemHandlers(nil)
+
+	// Test the HelloWorldHandler
+	server := httptest.NewServer(http.HandlerFunc(systemHandlers.HelloWorldHandler))
 	defer server.Close()
 	resp, err := http.Get(server.URL)
 	if err != nil {
@@ -20,7 +24,7 @@ func TestHandler(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status OK; got %v", resp.Status)
 	}
-	expected := "{\"message\":\"Hello World\"}"
+	expected := "{\"success\":true,\"data\":{\"message\":\"Hello World\"}}\n"
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("error reading response body. Err: %v", err)

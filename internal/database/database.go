@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"maya-canteen/internal/database/repository"
 	"maya-canteen/internal/models"
 	"os"
 	"strconv"
@@ -25,17 +26,44 @@ type Service interface {
 	// It returns an error if the connection cannot be closed.
 	Close() error
 
-	// Task-related operations
-	InitTaskTable() error
-	CreateTask(task *models.Task) error
-	GetAllTasks() ([]models.Task, error)
-	GetTask(id int64) (*models.Task, error)
-	UpdateTask(task *models.Task) error
-	DeleteTask(id int64) error
+	// GetDB returns the underlying database connection
+	GetDB() *sql.DB
+
+	// User-related operations
+	InitUserTable() error
+	CreateUser(user *models.User) error
+	GetAllUsers() ([]models.User, error)
+	GetUser(id int64) (*models.User, error)
+	UpdateUser(user *models.User) error
+	DeleteUser(id int64) error
+
+	// Transaction-related operations
+	InitTransactionTable() error
+	CreateTransaction(transaction *models.Transaction) error
+	GetAllTransactions() ([]models.Transaction, error)
+	GetLatestTransactions(limit int) ([]models.Transaction, error)
+	GetTransaction(id int64) (*models.Transaction, error)
+	UpdateTransaction(transaction *models.Transaction) error
+	DeleteTransaction(id int64) error
+	GetTransactionsByUserID(userID int64) ([]models.Transaction, error)
+	GetTransactionsByDateRange(startDate, endDate time.Time) ([]models.Transaction, error)
+	GetUsersBalances() ([]models.UserBalance, error)
+
+	// Product-related operations
+	InitProductTable() error
+	CreateProduct(product *models.Product) error
+	GetAllProducts() ([]models.Product, error)
+	GetProduct(id int64) (*models.Product, error)
+	UpdateProduct(product *models.Product) error
+	DeleteProduct(id int64) error
 }
 
 type service struct {
-	db *sql.DB
+	db                    *sql.DB
+	repositoryFactory     *repository.RepositoryFactory
+	userRepository        repository.UserRepositoryInterface
+	transactionRepository repository.TransactionRepositoryInterface
+	productRepository     repository.ProductRepositoryInterface
 }
 
 var (
@@ -66,8 +94,15 @@ func New() Service {
 		log.Fatalf("Error opening database: %v", err)
 	}
 
+	// Create repository factory
+	repoFactory := repository.NewRepositoryFactory(db)
+
 	dbInstance = &service{
-		db: db,
+		db:                    db,
+		repositoryFactory:     repoFactory,
+		userRepository:        repoFactory.NewUserRepository(),
+		transactionRepository: repoFactory.NewTransactionRepository(),
+		productRepository:     repoFactory.NewProductRepository(),
 	}
 	return dbInstance
 }
@@ -137,106 +172,93 @@ func (s *service) GetDB() *sql.DB {
 	return s.db
 }
 
-// InitTaskTable initializes the tasks table
-func (s *service) InitTaskTable() error {
-	query := `
-		CREATE TABLE IF NOT EXISTS tasks (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			title TEXT NOT NULL,
-			description TEXT,
-			status TEXT NOT NULL DEFAULT 'pending',
-			created_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL
-		)
-	`
-	_, err := s.db.Exec(query)
-	return err
+// User-related operations
+func (s *service) InitUserTable() error {
+	return s.userRepository.InitTable()
 }
 
-func (s *service) CreateTask(task *models.Task) error {
-	query := `
-		INSERT INTO tasks (title, description, status, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
-	`
-	now := time.Now()
-	result, err := s.db.Exec(query, task.Title, task.Description, task.Status, now, now)
-	if err != nil {
-		return err
-	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
-	}
-	task.ID = id
-	task.CreatedAt = now
-	task.UpdatedAt = now
-	return nil
+func (s *service) CreateUser(user *models.User) error {
+	return s.userRepository.Create(user)
 }
 
-func (s *service) GetAllTasks() ([]models.Task, error) {
-	query := `SELECT * FROM tasks ORDER BY created_at DESC`
-	rows, err := s.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var tasks []models.Task
-	for rows.Next() {
-		var task models.Task
-		err := rows.Scan(
-			&task.ID,
-			&task.Title,
-			&task.Description,
-			&task.Status,
-			&task.CreatedAt,
-			&task.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, task)
-	}
-	return tasks, nil
+func (s *service) GetAllUsers() ([]models.User, error) {
+	return s.userRepository.GetAll()
 }
 
-func (s *service) GetTask(id int64) (*models.Task, error) {
-	query := `SELECT * FROM tasks WHERE id = ?`
-	var task models.Task
-	err := s.db.QueryRow(query, id).Scan(
-		&task.ID,
-		&task.Title,
-		&task.Description,
-		&task.Status,
-		&task.CreatedAt,
-		&task.UpdatedAt,
-	)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &task, nil
+func (s *service) GetUser(id int64) (*models.User, error) {
+	return s.userRepository.Get(id)
 }
 
-func (s *service) UpdateTask(task *models.Task) error {
-	query := `
-		UPDATE tasks
-		SET title = ?, description = ?, status = ?, updated_at = ?
-		WHERE id = ?
-	`
-	now := time.Now()
-	_, err := s.db.Exec(query, task.Title, task.Description, task.Status, now, task.ID)
-	if err != nil {
-		return err
-	}
-	task.UpdatedAt = now
-	return nil
+func (s *service) UpdateUser(user *models.User) error {
+	return s.userRepository.Update(user)
 }
 
-func (s *service) DeleteTask(id int64) error {
-	query := `DELETE FROM tasks WHERE id = ?`
-	_, err := s.db.Exec(query, id)
-	return err
+func (s *service) DeleteUser(id int64) error {
+	return s.userRepository.Delete(id)
+}
+
+// Transaction-related operations
+func (s *service) InitTransactionTable() error {
+	return s.transactionRepository.InitTable()
+}
+
+func (s *service) CreateTransaction(transaction *models.Transaction) error {
+	return s.transactionRepository.Create(transaction)
+}
+
+func (s *service) GetAllTransactions() ([]models.Transaction, error) {
+	return s.transactionRepository.GetAll()
+}
+
+func (s *service) GetLatestTransactions(limit int) ([]models.Transaction, error) {
+	return s.transactionRepository.GetLatest(limit)
+}
+
+func (s *service) GetTransaction(id int64) (*models.Transaction, error) {
+	return s.transactionRepository.Get(id)
+}
+
+func (s *service) UpdateTransaction(transaction *models.Transaction) error {
+	return s.transactionRepository.Update(transaction)
+}
+
+func (s *service) DeleteTransaction(id int64) error {
+	return s.transactionRepository.Delete(id)
+}
+
+func (s *service) GetTransactionsByUserID(userID int64) ([]models.Transaction, error) {
+	return s.transactionRepository.GetByUserID(userID)
+}
+
+func (s *service) GetTransactionsByDateRange(startDate, endDate time.Time) ([]models.Transaction, error) {
+	return s.transactionRepository.GetByDateRange(startDate, endDate)
+}
+
+func (s *service) GetUsersBalances() ([]models.UserBalance, error) {
+	return s.transactionRepository.GetUsersBalances()
+}
+
+// Product-related operations
+func (s *service) InitProductTable() error {
+	return s.productRepository.InitTable()
+}
+
+func (s *service) CreateProduct(product *models.Product) error {
+	return s.productRepository.Create(product)
+}
+
+func (s *service) GetAllProducts() ([]models.Product, error) {
+	return s.productRepository.GetAll()
+}
+
+func (s *service) GetProduct(id int64) (*models.Product, error) {
+	return s.productRepository.Get(id)
+}
+
+func (s *service) UpdateProduct(product *models.Product) error {
+	return s.productRepository.Update(product)
+}
+
+func (s *service) DeleteProduct(id int64) error {
+	return s.productRepository.Delete(id)
 }

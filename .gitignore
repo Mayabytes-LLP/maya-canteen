@@ -32,3 +32,5 @@ main
 # OS X generated file
 .DS_Store
 
+# remove the database directory
+db/

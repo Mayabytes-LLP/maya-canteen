@@ -1,61 +1,40 @@
 package models
 
 import (
-	"database/sql"
 	"time"
 )
 
+// Transaction represents a financial transaction in the system
 type Transaction struct {
-	ID         int64     `json:"id"`
-	Name       string    `json:"name"`
-	EmployeeID string    `json:"employee_id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	Products   []Product `json:"products"`
+	ID              int64     `json:"id"`
+	UserID          int64     `json:"user_id"`
+	Amount          float64   `json:"amount"`
+	Description     string    `json:"description"`
+	TransactionType string    `json:"transaction_type"` // e.g., "deposit", "withdrawal", "purchase"
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
-type TransactionModel struct {
-	DB *sql.DB
+// GetID returns the transaction ID
+func (t *Transaction) GetID() int64 {
+	return t.ID
 }
 
-func NewTransactionModel(db *sql.DB) *TransactionModel {
-	return &TransactionModel{DB: db}
+// SetID sets the transaction ID
+func (t *Transaction) SetID(id int64) {
+	t.ID = id
 }
 
-func (m *TransactionModel) InitTable() error {
-	query := `
-    CREATE TABLE IF NOT EXISTS transactions (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      employee_id TEXT NOT NULL,
-      created_at DATETIME NOT NULL,
-      updated_at DATETIME NOT NULL,
-      products TEXT NOT NULL
-    )
-  `
-	_, err := m.DB.Exec(query)
-	return err
-}
-
-func (m *TransactionModel) Create(transaction *Transaction) error {
-	query := `
-    INSERT INTO transactions (name, employee_id, created_at, updated_at, products)
-    VALUES (?, ?, ?, ?, ?)
-  `
-
-	now := time.Now()
-	result, err := m.DB.Exec(query, transaction.Name, transaction.EmployeeID, now, now, transaction.Products)
-	if err != nil {
-		return err
+// SetCreatedAt sets the created timestamp
+func (t *Transaction) SetCreatedAt(timestamp interface{}) {
+	if ts, ok := timestamp.(time.Time); ok {
+		t.CreatedAt = ts
 	}
-	id, err := result.LastInsertId()
-	if err != nil {
-		return err
+}
+
+// SetUpdatedAt sets the updated timestamp
+func (t *Transaction) SetUpdatedAt(timestamp interface{}) {
+	if ts, ok := timestamp.(time.Time); ok {
+		t.UpdatedAt = ts
 	}
-
-	transaction.ID = id
-	transaction.CreatedAt = now
-	transaction.UpdatedAt = now
-
-	return nil
 }
