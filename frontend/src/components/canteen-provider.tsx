@@ -10,7 +10,7 @@ export interface AppState {
 }
 
 export const initialState: AppState = {
-  admin: true,
+  admin: false,
   currentPage: "canteen",
   currentUserId: null,
   setCurrentPage: () => null,
@@ -27,7 +27,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
   const [currentPage, setCurrentPage] = useState(initialState.currentPage);
   const [currentUserId, setCurrentUserId] = useState(
-    initialState.currentUserId
+    initialState.currentUserId,
   );
 
   const value = {

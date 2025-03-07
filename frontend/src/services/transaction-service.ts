@@ -16,6 +16,13 @@ export interface User {
   updated_at: string;
 }
 
+export interface UserBalace {
+  user_id: number;
+  name: string;
+  employee_id: string;
+  balance: number;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -230,6 +237,7 @@ export const transactionService = {
       throw new Error("Failed to fetch user transactions");
     }
     const res = await response.json();
+    console.log(userId, res.data);
     return res.data;
   },
 

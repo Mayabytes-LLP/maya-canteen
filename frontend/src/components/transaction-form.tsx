@@ -32,7 +32,6 @@ import {
   User,
 } from "@/services/transaction-service";
 
-import { DevTool } from "@hookform/devtools";
 import { AppContext } from "./canteen-provider";
 
 // Define cart item to represent a product and its quantity
@@ -112,7 +111,7 @@ export default function TransactionForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0
+      0,
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -132,7 +131,7 @@ export default function TransactionForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId
+      (product) => product.id === productId,
     );
 
     if (!selectedProduct) {
@@ -147,7 +146,7 @@ export default function TransactionForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit
+      (item) => item.productId === productId && item.single === isSingleUnit,
     );
 
     if (existingItemIndex >= 0) {
@@ -207,7 +206,7 @@ export default function TransactionForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`
+              }`,
           )
           .filter(Boolean)
           .join(", ");
@@ -505,7 +504,6 @@ export default function TransactionForm({
             </Button>
           </form>
         </Form>
-        <DevTool control={form.control} />
       </CardContent>
     </Card>
   );

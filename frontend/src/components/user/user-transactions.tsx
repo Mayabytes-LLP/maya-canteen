@@ -90,7 +90,7 @@ export default function UserTransactions({
           <div className="flex justify-center py-6">
             Loading transactions...
           </div>
-        ) : transactions.length === 0 ? (
+        ) : !transactions || transactions.length === 0 ? (
           <div className="text-center py-6 text-muted-foreground">
             No transactions found for this user
           </div>
@@ -163,7 +163,7 @@ export default function UserTransactions({
                   >
                     {formatAmount(
                       transaction.amount,
-                      transaction.transaction_type
+                      transaction.transaction_type,
                     )}
                   </div>
                 </div>
@@ -201,7 +201,7 @@ export default function UserTransactions({
                   >
                     {formatAmount(
                       selectedTransaction.amount,
-                      selectedTransaction.transaction_type
+                      selectedTransaction.transaction_type,
                     )}
                   </p>
                 </div>
