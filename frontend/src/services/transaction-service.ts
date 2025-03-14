@@ -1,6 +1,8 @@
 export interface Transaction {
   id: number;
-  user_id: number;
+  user_id: string;
+  employee_id: string;
+  user_name: string;
   amount: number;
   description: string;
   transaction_type: string;
@@ -170,8 +172,13 @@ export const transactionService = {
     return res.data;
   },
 
-  async getUser(id: number): Promise<User> {
-    const response = await fetch(`${API_BASE}/users/${id}`);
+  async getUser(id: string): Promise<User> {
+    console.log("id", id);
+    // make sure number is 5 digits
+    var paddedId = id.padStart(5, "0");
+    console.log("padded", paddedId);
+
+    const response = await fetch(`${API_BASE}/users/${paddedId}`);
     if (!response.ok) {
       throw new Error("Failed to fetch user");
     }
@@ -231,7 +238,7 @@ export const transactionService = {
     }
   },
 
-  async getTransactionsByUserId(userId: number): Promise<Transaction[]> {
+  async getTransactionsByUserId(userId: string): Promise<Transaction[]> {
     const response = await fetch(`${API_BASE}/users/${userId}/transactions`);
     if (!response.ok) {
       throw new Error("Failed to fetch user transactions");

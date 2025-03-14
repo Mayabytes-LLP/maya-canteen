@@ -15,6 +15,20 @@ type Transaction struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+// EployeeTransaction represents a financial transaction with user details
+type EployeeTransaction struct {
+	ID              int64     `json:"id"`
+	UserID          int64     `json:"user_id"`
+	UserName        string    `json:"user_name"`
+	EmployeeID      string    `json:"employee_id"`
+	TransactionID   int64     `json:"transaction_id"`
+	Amount          float64   `json:"amount"`
+	Description     string    `json:"description"`
+	TransactionType string    `json:"transaction_type"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 // GetID returns the transaction ID
 func (t *Transaction) GetID() int64 {
 	return t.ID

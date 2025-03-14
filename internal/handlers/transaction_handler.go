@@ -80,7 +80,6 @@ func (h *TransactionHandler) GetLatestTransactions(w http.ResponseWriter, r *htt
 		return
 	}
 
-	log.Println("transactions", transactions)
 	common.RespondWithSuccess(w, http.StatusOK, transactions)
 }
 

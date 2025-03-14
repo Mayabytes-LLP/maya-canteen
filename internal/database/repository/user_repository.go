@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"maya-canteen/internal/models"
 	"time"
 )
@@ -87,9 +88,12 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 
 // Get retrieves a single user by ID
 func (r *UserRepository) Get(id int64) (*models.User, error) {
-	query := `SELECT * FROM users WHERE id = ?`
+	fmt.Println("Get user by ID", id)
+	// make sure id int has 5 digits
+	idStr := fmt.Sprintf("%05d", id)
+	query := `SELECT * FROM users WHERE employee_id = ?`
 	var user models.User
-	err := r.db.QueryRow(query, id).Scan(
+	err := r.db.QueryRow(query, idStr).Scan(
 		&user.ID,
 		&user.Name,
 		&user.EmployeeId,

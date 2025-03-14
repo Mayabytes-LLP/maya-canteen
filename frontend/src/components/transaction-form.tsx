@@ -71,7 +71,7 @@ export default function TransactionForm({
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isSingleUnit, setIsSingleUnit] = useState<boolean>(false);
 
-  const { admin } = useContext(AppContext);
+  const { admin, currentUser } = useContext(AppContext);
 
   const defaultValues: FormValues = {
     user_id: "",
@@ -184,6 +184,10 @@ export default function TransactionForm({
 
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
+    if (!currentUser?.id) {
+      toast.error("Please select an employee");
+      return;
+    }
     if (data.transaction_type === "purchase" && cartItems.length === 0) {
       toast.error("Please add at least one product to the cart");
       return;
@@ -222,7 +226,9 @@ export default function TransactionForm({
       }
 
       const transaction = {
-        user_id: parseInt(data.user_id),
+        user_id: currentUser.id.toString(),
+        user_name: currentUser.name,
+        employee_id: currentUser.employee_id,
         amount: finalAmount,
         description: description,
         transaction_type: data.transaction_type,
@@ -496,8 +502,7 @@ export default function TransactionForm({
                 (form.watch("transaction_type") === "purchase" &&
                   cartItems.length === 0) ||
                 (form.watch("transaction_type") === "deposit" &&
-                  !form.watch("amount")) ||
-                !form.formState.isValid
+                  !form.watch("amount"))
               }
             >
               {isSubmitting ? "Processing..." : "Submit Transaction"}

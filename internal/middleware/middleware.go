@@ -21,10 +21,16 @@ func Chain(h http.Handler, middlewares ...Middleware) http.Handler {
 func CORS() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// CORS headers
-			w.Header().Set("Access-Control-Allow-Origin", "*") // Use "*" for all origins, or replace with specific origins
+			// Skip CORS for WebSocket connections
+			if r.Header.Get("Upgrade") == "websocket" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// CORS headers for regular HTTP requests
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-			w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token")
+			w.Header().Set("Access-Control-Allow-Headers", "Accept, Authorization, Content-Type, X-CSRF-Token, Upgrade, Connection")
 			w.Header().Set("Access-Control-Allow-Credentials", "false") // Set to "true" if credentials are needed
 
 			// Handle preflight OPTIONS requests
@@ -42,6 +48,12 @@ func CORS() Middleware {
 func Logger() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Skip logging for WebSocket connections
+			if r.Header.Get("Upgrade") == "websocket" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			start := time.Now()
 
 			// Create a custom response writer to capture the status code
@@ -85,11 +97,15 @@ func Recover() Middleware {
 // responseWriter is a custom response writer that captures the status code
 type responseWriter struct {
 	http.ResponseWriter
-	statusCode int
+	statusCode  int
+	wroteHeader bool
 }
 
 // WriteHeader captures the status code
 func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
+	if !rw.wroteHeader {
+		rw.statusCode = code
+		rw.ResponseWriter.WriteHeader(code)
+		rw.wroteHeader = true
+	}
 }

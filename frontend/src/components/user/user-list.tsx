@@ -97,8 +97,8 @@ export default function UserList({ refreshTrigger = 0 }: UserListProps) {
         users.map((user) =>
           user.id === editUser.id
             ? { ...user, name: editName, employee_id: editEmployeeId }
-            : user
-        )
+            : user,
+        ),
       );
 
       toast.success("User updated successfully");
@@ -301,7 +301,7 @@ export default function UserList({ refreshTrigger = 0 }: UserListProps) {
           </DialogHeader>
           {selectedUserId && (
             <UserTransactions
-              userId={selectedUserId}
+              userId={editEmployeeId}
               onClose={() => setOpenTransactionsDialog(false)}
             />
           )}

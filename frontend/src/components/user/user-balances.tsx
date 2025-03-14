@@ -51,7 +51,7 @@ export default function UserBalances({
   const [editName, setEditName] = useState("");
   const [editEmployeeId, setEditEmployeeId] = useState("");
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openTransactionsDialog, setOpenTransactionsDialog] = useState(false);
@@ -77,7 +77,7 @@ export default function UserBalances({
   }, [refreshTrigger]);
 
   const handleEdit = async (user: UserBalance) => {
-    const currentUser = await transactionService.getUser(user.user_id);
+    const currentUser = await transactionService.getUser(user.employee_id);
     setEditUser(currentUser);
     setEditName(user.user_name);
     setEditEmployeeId(user.employee_id);
@@ -141,7 +141,7 @@ export default function UserBalances({
     }
   };
 
-  const showUserTransactions = (userId: number) => {
+  const showUserTransactions = (userId: string) => {
     setSelectedUserId(userId);
     setOpenTransactionsDialog(true);
   };
@@ -186,7 +186,9 @@ export default function UserBalances({
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => showUserTransactions(balance.user_id)}
+                          onClick={() =>
+                            showUserTransactions(balance.employee_id)
+                          }
                           className="h-8 w-8 p-0"
                           title="View Transactions"
                         >

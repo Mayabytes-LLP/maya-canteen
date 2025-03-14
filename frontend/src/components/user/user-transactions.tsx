@@ -21,7 +21,7 @@ import {
 import { Info } from "lucide-react";
 
 interface UserTransactionsProps {
-  userId: number;
+  userId: string;
   onClose: () => void;
 }
 

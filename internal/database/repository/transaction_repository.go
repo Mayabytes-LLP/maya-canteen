@@ -39,7 +39,7 @@ func (r *TransactionRepository) InitTable() error {
 func (r *TransactionRepository) Create(transaction *models.Transaction) error {
 	query := `
 		INSERT INTO transactions (user_id, amount, description, transaction_type, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	result, err := r.db.Exec(
@@ -147,20 +147,30 @@ func (r *TransactionRepository) Delete(id int64) error {
 }
 
 // GetByUserID retrieves all transactions for a specific user
-func (r *TransactionRepository) GetByUserID(userID int64) ([]models.Transaction, error) {
-	query := `SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC`
+func (r *TransactionRepository) GetByUserID(userID int64) ([]models.EployeeTransaction, error) {
+	query := `
+        SELECT users.id, users.name, users.employee_id
+        WHERE users.id = ? 
+        FROM users
+        LEFT JOIN transactions ON users.id = transactions.user_id
+        ORDER BY created_at DESC
+    `
+	// query := `SELECT * FROM transactions WHERE id = ? ORDER BY created_at DESC`
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var transactions []models.Transaction
+	var transactions []models.EployeeTransaction
 	for rows.Next() {
-		var transaction models.Transaction
+		var transaction models.EployeeTransaction
 		err := rows.Scan(
 			&transaction.ID,
 			&transaction.UserID,
+			&transaction.UserName,
+			&transaction.EmployeeID,
+			&transaction.TransactionID,
 			&transaction.Amount,
 			&transaction.Description,
 			&transaction.TransactionType,
