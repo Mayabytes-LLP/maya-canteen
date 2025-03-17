@@ -39,6 +39,8 @@ func NewWebSocketHandler(db database.Service) *WebsocketHandler {
 }
 
 func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
+	log.Printf("New WebSocket connection request from %s", r.RemoteAddr)
+
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
@@ -49,7 +51,6 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	h.clients[conn] = true
 	h.mu.Unlock()
-
 	// Send initial connection message
 	msg := WSMessage{
 		Type:    "connected",
@@ -103,20 +104,33 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *WebsocketHandler) Broadcast(event interface{}) {
+func (h *WebsocketHandler) Broadcast(msgType string, payload interface{}) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	message := WSMessage{
-		Type:    "attendance_event",
-		Payload: event,
+		Type:    msgType,
+		Payload: payload,
 	}
 
+	log.Printf("Broadcasting message: %+v", message)
+	log.Printf("Number of connected clients: %d", len(h.clients))
+
+	deadClients := []*websocket.Conn{}
+
+	log.Printf("Broadcasting message: %v", message)
+	// list all the clients and send the message to each of them
+	log.Printf("Number of clients: %v", len(h.clients))
 	for client := range h.clients {
 		if err := client.WriteJSON(message); err != nil {
 			log.Printf("WebSocket write error: %v", err)
 			client.Close()
-			delete(h.clients, client)
+			deadClients = append(deadClients, client)
 		}
+	}
+
+	// Clean up dead clients
+	for _, client := range deadClients {
+		delete(h.clients, client)
 	}
 }

@@ -118,8 +118,8 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 	err := r.db.QueryRow(query, idStr).Scan(
 		&user.ID,
 		&user.Name,
-		&user.Phone,
 		&user.EmployeeId,
+		&user.Phone,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)

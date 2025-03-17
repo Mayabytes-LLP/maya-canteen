@@ -31,13 +31,10 @@ func NewServer() *http.Server {
 		db:   database.New(),
 	}
 
-	// Create handler using routes module
-	handler := routes.RegisterRoutes(s.db)
-
 	// Declare Server config
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
-		Handler:      handler,
+		Handler:      routes.RegisterRoutes(s.db),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,

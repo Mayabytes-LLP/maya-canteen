@@ -7,11 +7,13 @@ import (
 	"github.com/gorilla/mux"
 )
 
+var GlobalWebSocketHandler *handlers.WebsocketHandler
+
 // RegisterWebSocketRoute registers the WebSocket route
 func RegisterWebSocketRoute(router *mux.Router, db database.Service) {
 	// Create WebSocket handler
-	websocketHandler := handlers.NewWebSocketHandler(db)
+	GlobalWebSocketHandler = handlers.NewWebSocketHandler(db)
 
 	// Register WebSocket route directly without subrouter
-	router.HandleFunc("/ws", websocketHandler.Socket)
+	router.HandleFunc("/ws", GlobalWebSocketHandler.Socket)
 }

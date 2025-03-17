@@ -17,25 +17,18 @@ func RegisterRoutes(db database.Service) http.Handler {
 	// Create main router
 	router := mux.NewRouter()
 
-	// Create a separate router for WebSocket without middleware
-	wsRouter := mux.NewRouter()
-	RegisterWebSocketRoute(wsRouter, db)
+	RegisterWebSocketRoute(router, db)
 
 	// Create HTTP router with middleware
-	httpRouter := mux.NewRouter()
-	RegisterSystemRoutes(httpRouter, db)
-	RegisterTransactionRoutes(httpRouter, db)
-	RegisterUserRoutes(httpRouter, db)
-	RegisterProductRoutes(httpRouter, db)
+	RegisterSystemRoutes(router, db)
+	RegisterTransactionRoutes(router, db)
+	RegisterUserRoutes(router, db)
+	RegisterProductRoutes(router, db)
 
 	// Apply middleware to HTTP routes
-	httpHandlerWithMiddleware := middleware.Chain(httpRouter, middleware.CORS(), middleware.Logger(), middleware.Recover())
+	httpHandlerWithMiddleware := middleware.Chain(router, middleware.CORS(), middleware.Logger(), middleware.Recover())
 
-	// Combine both routers
-	router.PathPrefix("/ws").Handler(wsRouter)
-	router.PathPrefix("/").Handler(httpHandlerWithMiddleware)
-
-	return router
+	return httpHandlerWithMiddleware
 }
 
 // initDatabaseTables initializes all database tables

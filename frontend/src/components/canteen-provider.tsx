@@ -11,6 +11,7 @@ export interface AppState {
   ) => void;
   setCurrentUser: (user: User) => void;
   setAdmin: (admin: boolean) => void;
+  ws: React.RefObject<WebSocket | null>;
 }
 
 export const initialState: AppState = {
@@ -20,6 +21,7 @@ export const initialState: AppState = {
   setCurrentPage: () => null,
   setCurrentUser: () => null,
   setAdmin: () => null,
+  ws: { current: null },
 };
 
 export const AppContext = createContext<AppState>(initialState);
@@ -52,9 +54,9 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
               ws.current?.send(JSON.stringify({ type: "pong" }));
               break;
             case "attendance_event": {
-              // Handle user data updates
-              console.log("User data:", message);
-              const user = await transactionService.getUser(message);
+              console.log("Attendance event:", message);
+              const { userId } = message.payload;
+              const user = await transactionService.getUser(userId);
               if (!user) {
                 toast.error("User not found");
                 return;
@@ -73,8 +75,8 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
         console.log("WebSocket disconnected");
         // Attempt to reconnect after 5 seconds
         setTimeout(() => {
-          console.log("Attempting to reconnect...");
           if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
+            console.log("Attempting to reconnect...");
             connectWebSocket();
           }
         }, 5000);
@@ -104,11 +106,13 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     currentUser,
     setCurrentUser,
     setAdmin,
+    ws,
   };
 
   const admins = ["100058", "100037"];
 
   useEffect(() => {
+    console.log("currentUser", currentUser);
     if (!currentUser?.id) {
       setCurrentPage("screenSaver");
       setAdmin(false);

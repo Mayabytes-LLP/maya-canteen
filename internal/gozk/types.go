@@ -20,7 +20,7 @@ type User struct {
 }
 
 type Attendance struct {
-	UserID     int64
+	UserID     string
 	AttendedAt time.Time
 }
 

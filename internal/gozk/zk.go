@@ -297,7 +297,8 @@ func (zk *ZK) GetAttendances() ([]*Attendance, error) {
 			return nil, err
 		}
 
-		userID, err := strconv.ParseInt(strings.Replace(v[1].(string), "\x00", "", -1), 10, 64)
+		// userID, err := strconv.ParseInt(strings.Replace(v[1].(string), "\x00", "", -1), 10, 64)
+		userID := strings.Replace(v[1].(string), "\x00", "", -1)
 		if err != nil {
 			return nil, err
 		}
@@ -502,22 +503,19 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 
 					timestamp := zk.decodeTimeHex([]byte(timehex))
 
-					uid := int64(0)
-					userIDInt, err := strconv.ParseInt(userID, 10, 64)
-					if err == nil {
-						// Find matching user by user_id
-						for _, user := range users {
-							if user.Uid == userID {
-								uid = userIDInt
-								break
-							}
-						}
-						if uid == 0 {
-							uid = userIDInt
+					uid := ""
+					// Find matching user by user_id
+					for _, user := range users {
+						if user.Uid == userID {
+							uid = userID
+							break
 						}
 					}
+					if uid == "" {
+						uid = userID
+					}
 
-					c <- &Attendance{UserID: userIDInt, AttendedAt: timestamp}
+					c <- &Attendance{UserID: userID, AttendedAt: timestamp}
 					log.Printf("UserID %v timestamp %v status %v punch %v\n", userID, timestamp, status, punch)
 				}
 			}

@@ -2,11 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"maya-canteen/internal/gozk"
-	"maya-canteen/internal/handlers"
 	"maya-canteen/internal/server"
+	"maya-canteen/internal/server/routes"
 	"net/http"
 	"os"
 	"os/signal"
@@ -65,75 +64,28 @@ func main() {
 	if err := zkSocket.Connect(); err != nil {
 		log.Fatalf("Failed to connect to ZK device: %v", err)
 	}
-
-	props, err := zkSocket.GetProperties()
-	if err != nil {
-		log.Fatalf("Failed to get ZK device properties: %v", err)
-	}
-
-	fmt.Printf("ZK device Total Users: %v\n", props.TotalUsers)
-	fmt.Printf("ZK device Total Fingers: %v\n", props.TotalFingers)
-	fmt.Printf("ZK device Total Records: %v\n", props.TotalRecords)
-
-	fmt.Println("***************************************")
-	fmt.Println("***************************************")
-
-	// users, err := zkSocket.GetZktecoUsers()
-	// if err != nil {
-	// 	log.Printf("Failed to get ZK device users: %v", err)
-	// } else {
-	//
-	// 	usersFile, err := setupLogFile("zk_users.log")
-	// 	if err != nil {
-	// 		log.Fatalf("Failed to open log file: %v", err)
-	// 	}
-	// 	defer usersFile.Close()
-	// 	usersLogger := log.New(usersFile, "", log.LstdFlags)
-	//
-	// 	for _, user := range users {
-	// 		usersLogger.Printf("%v", user)
-	// 	}
-	//
-	// 	fmt.Printf("Users: %d\n", len(users))
-	//
-	// }
-
-	attendances, err := zkSocket.GetAttendances()
-	if err != nil {
-		log.Fatalf("Failed to get ZK device users: %v", err)
-	}
-	fmt.Printf("Attendances: %d\n", len(attendances))
-
-	fmt.Println("***************************************")
-	fmt.Println("***************************************")
-
-	log.Println("Starting live capture")
+	log.Println("Zk Device Connected")
 	c, err := zkSocket.LiveCapture()
 	if err != nil {
 		log.Fatalf("Failed to start live capture: %v", err)
 	}
 
-	// Create a WebSocket handler
-	wsHandler := handlers.NewWebSocketHandler(nil)
-
 	go func() {
 		for event := range c {
-			// check if event contains user data
-			log.Printf("User: %v", event.UserID)
-			log.Printf("TimeStamp: %v", event.AttendedAt)
-			if event.UserID != 0 {
-				// send the event to the web socket
-				log.Printf("Sending event to web socket: %v", event.UserID)
+			if event.UserID != "" {
+				log.Printf("[WebSocket] Broadcasting attendance event - UserID: %v, Time: %v",
+					event.UserID, event.AttendedAt)
 				eventLogger.Printf("Event: %v", event)
-				wsHandler.Broadcast(event.UserID)
+				routes.GlobalWebSocketHandler.Broadcast("attendance_event", map[string]interface{}{
+					"user_id":   event.UserID,
+					"timestamp": event.AttendedAt.Format(time.RFC3339),
+				})
 			}
 		}
 	}()
 
-	// Create a done channel to signal when the shutdown is complete
 	done := make(chan bool, 1)
 
-	// Run graceful shutdown in a separate goroutine
 	go gracefulShutdown(apiServer, zkSocket, done)
 
 	// Start the API server
