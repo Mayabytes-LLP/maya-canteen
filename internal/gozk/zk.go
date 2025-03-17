@@ -332,7 +332,8 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 		return nil, errors.New("is capturing")
 	}
 
-	if err := zk.GetUsers(); err != nil {
+	users, err := zk.GetZktecoUsers()
+	if err != nil {
 		return nil, err
 	}
 
@@ -340,13 +341,25 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 		return nil, err
 	}
 
-	if zk.disabled {
-		if err := zk.EnableDevice(); err != nil {
+	// First disable the device to ensure no pending operations
+	if !zk.disabled {
+		if err := zk.DisableDevice(); err != nil {
 			return nil, err
 		}
 	}
 
+	// Clear any existing event registrations
+	if err := zk.regEvent(0); err != nil {
+		return nil, err
+	}
+
+	// Register for attendance log events
 	if err := zk.regEvent(EF_ATTLOG); err != nil {
+		return nil, err
+	}
+
+	// Re-enable the device
+	if err := zk.EnableDevice(); err != nil {
 		return nil, err
 	}
 
@@ -364,59 +377,152 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 		for {
 			select {
 			case <-zk.capturing:
+				log4go.Info("Capturing stopped")
 				return
 			default:
-
+				log4go.Info("Receiving data aa")
 				data, err := zk.receiveData(1032, KeepAlivePeriod)
-				if err != nil && !strings.Contains(err.Error(), "timeout") {
-					log4go.Error(err)
+				if err != nil {
+					if strings.Contains(err.Error(), "timeout") {
+						// Timeout is expected, send keep-alive
+						_, err := zk.sendCommand(CMD_REG_EVENT, nil, 8)
+						if err != nil {
+							log4go.Error("Failed to send keep-alive:", err)
+							return
+						}
+						continue
+					}
+					log4go.Error("Error receiving data:", err)
 					return
 				}
+
+				// Send acknowledgment
 				if err := zk.ackOK(); err != nil {
+					log4go.Error("Failed to send ACK:", err)
 					return
 				}
 
 				if len(data) == 0 {
-					log4go.Info("Continue")
+					log4go.Info("Empty data received, continuing")
 					continue
 				}
 
-				// size := mustUnpack([]string{"H", "H", "I"}, data[:8])[2].(int)
 				header := mustUnpack([]string{"H", "H", "H", "H"}, data[8:16])
 				data = data[16:]
 
 				if header[0].(int) != CMD_REG_EVENT {
-					log.Println("Skip REG EVENT")
+					log4go.Info("Not an event, skipping")
 					continue
 				}
 
-				for len(data) >= 12 {
-					unpack := []interface{}{}
+				log4go.Info("Data received:", data)
+				// Print the data in a more readable format for debugging
+				dataStr := ""
+				for _, b := range data {
+					if b >= 32 && b <= 126 { // Printable ASCII
+						dataStr += string(b)
+					} else {
+						dataStr += fmt.Sprintf("\\x%02x", b)
+					}
+				}
+				log4go.Info("Data as string:", dataStr)
+				for len(data) >= 10 {
+					var userID string
+					var status, punch int
+					var timehex string
+					var unpack []interface{}
 
-					if len(data) == 12 {
+					if len(data) == 10 {
+						unpack = mustUnpack([]string{"H", "B", "B", "6s"}, data)
+						userID = fmt.Sprintf("%d", unpack[0].(int))
+						status = unpack[1].(int)
+						punch = unpack[2].(int)
+						timehex = unpack[3].(string)
+						data = data[10:]
+					} else if len(data) == 12 {
 						unpack = mustUnpack([]string{"I", "B", "B", "6s"}, data)
+						userID = fmt.Sprintf("%d", unpack[0].(int))
+						status = unpack[1].(int)
+						punch = unpack[2].(int)
+						timehex = unpack[3].(string)
 						data = data[12:]
+					} else if len(data) == 14 {
+						unpack = mustUnpack([]string{"H", "B", "B", "6s", "4s"}, data)
+						userID = fmt.Sprintf("%d", unpack[0].(int))
+						status = unpack[1].(int)
+						punch = unpack[2].(int)
+						timehex = unpack[3].(string)
+						data = data[14:]
 					} else if len(data) == 32 {
 						unpack = mustUnpack([]string{"24s", "B", "B", "6s"}, data[:32])
+						userID = strings.Replace(unpack[0].(string), "\x00", "", -1)
+						status = unpack[1].(int)
+						punch = unpack[2].(int)
+						timehex = unpack[3].(string)
 						data = data[32:]
 					} else if len(data) == 36 {
+						// First try to parse as a 24-byte user ID format
 						unpack = mustUnpack([]string{"24s", "B", "B", "6s", "4s"}, data[:36])
+						rawUserID := unpack[0].(string)
+						// Check if the first few bytes contain ASCII digits (common for numeric user IDs)
+						if rawUserID[0] >= '0' && rawUserID[0] <= '9' {
+							// This appears to be a numeric ID stored as ASCII in the first part
+							// Extract until we hit a null byte or non-numeric character
+							numericPart := ""
+							for i := 0; i < len(rawUserID); i++ {
+								if rawUserID[i] == 0 || !(rawUserID[i] >= '0' && rawUserID[i] <= '9') {
+									break
+								}
+								numericPart += string(rawUserID[i])
+							}
+							if numericPart != "" {
+								userID = numericPart
+							} else {
+								userID = strings.Replace(rawUserID, "\x00", "", -1)
+							}
+						} else {
+							userID = strings.Replace(rawUserID, "\x00", "", -1)
+						}
+						status = unpack[1].(int)
+						punch = unpack[2].(int)
+						timehex = unpack[3].(string)
 						data = data[36:]
+					} else if len(data) == 37 {
+						unpack = mustUnpack([]string{"24s", "B", "B", "6s", "5s"}, data[:37])
+						userID = strings.Replace(unpack[0].(string), "\x00", "", -1)
+						status = unpack[1].(int)
+						punch = unpack[2].(int)
+						timehex = unpack[3].(string)
+						data = data[37:]
 					} else if len(data) >= 52 {
 						unpack = mustUnpack([]string{"24s", "B", "B", "6s", "20s"}, data[:52])
+						userID = strings.Replace(unpack[0].(string), "\x00", "", -1)
+						status = unpack[1].(int)
+						punch = unpack[2].(int)
+						timehex = unpack[3].(string)
 						data = data[52:]
 					}
 
-					timestamp := zk.decodeTimeHex([]byte(unpack[3].(string)))
+					timestamp := zk.decodeTimeHex([]byte(timehex))
 
-					userID, err := strconv.ParseInt(strings.Replace(unpack[0].(string), "\x00", "", -1), 10, 64)
-					if err != nil {
-						log.Println(err)
-						continue
+					uid := int64(0)
+					userIDInt, err := strconv.ParseInt(userID, 10, 64)
+					log4go.Info("UserIDInt %v", userIDInt)
+					if err == nil {
+						// Find matching user by user_id
+						for _, user := range users {
+							if user.Uid == userID {
+								uid = userIDInt
+								break
+							}
+						}
+						if uid == 0 {
+							uid = userIDInt
+						}
 					}
 
-					c <- &Attendance{UserID: userID, AttendedAt: timestamp}
-					log.Printf("UserID %v timestampe %v \n", userID, timestamp)
+					c <- &Attendance{UserID: userIDInt, AttendedAt: timestamp}
+					log.Printf("UserID %v timestamp %v status %v punch %v\n", userID, timestamp, status, punch)
 				}
 			}
 		}
