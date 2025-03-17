@@ -6,7 +6,7 @@ import (
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/handlers/common"
 	"net/http"
-	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -15,6 +15,8 @@ import (
 type WebsocketHandler struct {
 	common.BaseHandler
 	upgrader websocket.Upgrader
+	clients  map[*websocket.Conn]bool
+	mu       sync.Mutex
 }
 
 type WSMessage struct {
@@ -32,6 +34,7 @@ func NewWebSocketHandler(db database.Service) *WebsocketHandler {
 				return true // Allow all origins for development
 			},
 		},
+		clients: make(map[*websocket.Conn]bool),
 	}
 }
 
@@ -42,6 +45,10 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+
+	h.mu.Lock()
+	h.clients[conn] = true
+	h.mu.Unlock()
 
 	// Send initial connection message
 	msg := WSMessage{
@@ -70,6 +77,9 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 					log.Printf("WebSocket read error: %v", err)
 				}
+				h.mu.Lock()
+				delete(h.clients, conn)
+				h.mu.Unlock()
 				return
 			}
 
@@ -82,21 +92,31 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 
 			// Handle different message types
 			switch wsMsg.Type {
-			case "pong":
+			case "ping":
 				// Client is alive
+				log.Printf("Received ping message")
 				continue
-			case "get_user":
-				if id, ok := wsMsg.Payload.(string); ok {
-					if userID, err := strconv.ParseInt(id, 10, 64); err == nil {
-						if user, err := h.DB.GetUser(userID); err == nil {
-							conn.WriteJSON(WSMessage{
-								Type:    "user_data",
-								Payload: user,
-							})
-						}
-					}
-				}
+			default:
+				log.Printf("Unknown message type: %s", wsMsg.Type)
 			}
+		}
+	}
+}
+
+func (h *WebsocketHandler) Broadcast(event interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	message := WSMessage{
+		Type:    "attendance_event",
+		Payload: event,
+	}
+
+	for client := range h.clients {
+		if err := client.WriteJSON(message); err != nil {
+			log.Printf("WebSocket write error: %v", err)
+			client.Close()
+			delete(h.clients, client)
 		}
 	}
 }

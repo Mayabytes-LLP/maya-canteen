@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"maya-canteen/internal/gozk"
+	"maya-canteen/internal/handlers"
 	"maya-canteen/internal/server"
 	"net/http"
 	"os"
@@ -106,18 +107,25 @@ func main() {
 	fmt.Println("***************************************")
 	fmt.Println("***************************************")
 
-	eventLogger.Println("Starting live capture")
+	log.Println("Starting live capture")
 	c, err := zkSocket.LiveCapture()
 	if err != nil {
 		log.Fatalf("Failed to start live capture: %v", err)
 	}
 
+	// Create a WebSocket handler
+	wsHandler := handlers.NewWebSocketHandler(nil)
+
 	go func() {
 		for event := range c {
 			// check if event contains user data
+			log.Printf("User: %v", event.UserID)
+			log.Printf("TimeStamp: %v", event.AttendedAt)
 			if event.UserID != 0 {
 				// send the event to the web socket
-
+				log.Printf("Sending event to web socket: %v", event.UserID)
+				eventLogger.Printf("Event: %v", event)
+				wsHandler.Broadcast(event.UserID)
 			}
 		}
 	}()

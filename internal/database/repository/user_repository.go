@@ -37,14 +37,16 @@ func (r *UserRepository) InitTable() error {
 	err1 := r.Create(&models.User{
 		Name:       "Abdul Rafay",
 		EmployeeId: "100058",
+		Phone:      "+923452324442",
 	})
 	err2 := r.Create(&models.User{
 		Name:       "Qasim Imtiaz",
 		EmployeeId: "100037",
+		Phone:      "+923452565003",
 	})
 
 	if err1 != nil || err2 != nil {
-		return fmt.Errorf("failed to add users to the database")
+		fmt.Printf("Error in adding admin possibly already exists to the database %v %v\n", err1, err2)
 	}
 
 	return nil
@@ -61,6 +63,7 @@ func (r *UserRepository) Create(user *models.User) error {
 		query,
 		user.Name,
 		user.EmployeeId,
+		user.Phone,
 		now,
 		now,
 	)

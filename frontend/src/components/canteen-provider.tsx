@@ -1,12 +1,13 @@
-import { User } from "@/services/transaction-service";
+import { transactionService, User } from "@/services/transaction-service";
 import { createContext, useEffect, useRef, useState, type FC } from "react";
+import { toast } from "sonner";
 
 export interface AppState {
   admin: boolean;
   currentPage: "canteen" | "products" | "users" | "screenSaver";
   currentUser: User | null;
   setCurrentPage: (
-    page: "canteen" | "products" | "users" | "screenSaver",
+    page: "canteen" | "products" | "users" | "screenSaver"
   ) => void;
   setCurrentUser: (user: User) => void;
   setAdmin: (admin: boolean) => void;
@@ -41,7 +42,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
         console.log("WebSocket connected");
       };
 
-      ws.current.onmessage = (event) => {
+      ws.current.onmessage = async (event) => {
         try {
           const message = JSON.parse(event.data);
           console.log("WebSocket message:", message);
@@ -50,12 +51,18 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
             case "ping":
               ws.current?.send(JSON.stringify({ type: "pong" }));
               break;
-            case "user_data":
+            case "attendance_event": {
               // Handle user data updates
-              if (message.payload) {
-                setCurrentUser(message.payload);
+              console.log("User data:", message);
+              const user = await transactionService.getUser(message);
+              if (!user) {
+                toast.error("User not found");
+                return;
               }
+              setCurrentUser(user);
+              toast.success("User logged in successfully");
               break;
+            }
           }
         } catch (error) {
           console.error("WebSocket message error:", error);
@@ -99,7 +106,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     setAdmin,
   };
 
-  const admins = ["100058", "100058"];
+  const admins = ["100058", "100037"];
 
   useEffect(() => {
     if (!currentUser?.id) {
