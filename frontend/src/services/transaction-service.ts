@@ -1,7 +1,6 @@
 export interface Transaction {
   id: number;
-  user_id: string;
-  employee_id: string;
+  user_id: number;
   user_name: string;
   amount: number;
   description: string;
@@ -87,6 +86,7 @@ export const transactionService = {
   async createTransaction(
     transaction: Omit<Transaction, "id" | "created_at" | "updated_at">,
   ): Promise<Transaction> {
+    console.log(transaction);
     const response = await fetch(`${API_BASE}/transactions`, {
       method: "POST",
       headers: {

@@ -6,7 +6,7 @@ export interface AppState {
   currentPage: "canteen" | "products" | "users" | "screenSaver";
   currentUser: User | null;
   setCurrentPage: (
-    page: "canteen" | "products" | "users" | "screenSaver"
+    page: "canteen" | "products" | "users" | "screenSaver",
   ) => void;
   setCurrentUser: (user: User) => void;
   setAdmin: (admin: boolean) => void;
@@ -99,7 +99,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     setAdmin,
   };
 
-  const admins = ["00058", "00092"];
+  const admins = ["100058", "100058"];
 
   useEffect(() => {
     if (!currentUser?.id) {

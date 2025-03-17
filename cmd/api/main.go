@@ -97,9 +97,6 @@ func main() {
 	//
 	// }
 
-	fmt.Println("***************************************")
-	fmt.Println("***************************************")
-
 	attendances, err := zkSocket.GetAttendances()
 	if err != nil {
 		log.Fatalf("Failed to get ZK device users: %v", err)
@@ -117,7 +114,11 @@ func main() {
 
 	go func() {
 		for event := range c {
-			eventLogger.Printf("%v", event)
+			// check if event contains user data
+			if event.UserID != 0 {
+				// send the event to the web socket
+
+			}
 		}
 	}()
 

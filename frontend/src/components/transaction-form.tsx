@@ -226,9 +226,7 @@ export default function TransactionForm({
       }
 
       const transaction = {
-        user_id: currentUser.id.toString(),
-        user_name: currentUser.name,
-        employee_id: currentUser.employee_id,
+        user_id: parseInt(currentUser.id), // Convert to number as backend expects
         amount: finalAmount,
         description: description,
         transaction_type: data.transaction_type,
