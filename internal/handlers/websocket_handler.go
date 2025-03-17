@@ -86,7 +86,6 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 				// Client is alive
 				continue
 			case "get_user":
-
 				if id, ok := wsMsg.Payload.(string); ok {
 					if userID, err := strconv.ParseInt(id, 10, 64); err == nil {
 						if user, err := h.DB.GetUser(userID); err == nil {

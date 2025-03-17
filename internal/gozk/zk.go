@@ -377,10 +377,8 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 		for {
 			select {
 			case <-zk.capturing:
-				log4go.Info("Capturing stopped")
 				return
 			default:
-				log4go.Info("Receiving data aa")
 				data, err := zk.receiveData(1032, KeepAlivePeriod)
 				if err != nil {
 					if strings.Contains(err.Error(), "timeout") {
@@ -415,7 +413,6 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 					continue
 				}
 
-				log4go.Info("Data received:", data)
 				// Print the data in a more readable format for debugging
 				dataStr := ""
 				for _, b := range data {
@@ -507,7 +504,6 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 
 					uid := int64(0)
 					userIDInt, err := strconv.ParseInt(userID, 10, 64)
-					log4go.Info("UserIDInt %v", userIDInt)
 					if err == nil {
 						// Find matching user by user_id
 						for _, user := range users {

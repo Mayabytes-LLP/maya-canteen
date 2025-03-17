@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/errors"
@@ -28,7 +29,10 @@ func NewTransactionHandler(db database.Service) *TransactionHandler {
 // CreateTransaction handles POST /api/transactions
 func (h *TransactionHandler) CreateTransaction(w http.ResponseWriter, r *http.Request) {
 	var transaction models.Transaction
+
 	if err := h.DecodeJSON(r, &transaction); err != nil {
+		// log the error and the received data
+		fmt.Printf("Error decoding JSON: %v\n", err)
 		h.HandleError(w, err)
 		return
 	}

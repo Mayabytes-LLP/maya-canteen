@@ -15,8 +15,8 @@ type Transaction struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
-// EployeeTransaction represents a financial transaction with user details
-type EployeeTransaction struct {
+// EmployeeTransaction represents a financial transaction with user details
+type EmployeeTransaction struct {
 	ID              int64     `json:"id"`
 	UserID          int64     `json:"user_id"`
 	UserName        string    `json:"user_name"`

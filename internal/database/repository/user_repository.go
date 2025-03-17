@@ -23,20 +23,38 @@ func (r *UserRepository) InitTable() error {
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
-			employee_id TEXT NOT NULL,
+			employee_id TEXT NOT NULL UNIQUE,
+    	phone TEXT NOT NULL UNIQUE,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)
 	`
 	_, err := r.db.Exec(query)
-	return err
+	if err != nil {
+		return err
+	}
+
+	err1 := r.Create(&models.User{
+		Name:       "Abdul Rafay",
+		EmployeeId: "100058",
+	})
+	err2 := r.Create(&models.User{
+		Name:       "Qasim Imtiaz",
+		EmployeeId: "100037",
+	})
+
+	if err1 != nil || err2 != nil {
+		return fmt.Errorf("failed to add users to the database")
+	}
+
+	return nil
 }
 
 // Create inserts a new user into the database
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
-		INSERT INTO users (name, employee_id, created_at, updated_at)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO users (name, employee_id, phone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	result, err := r.db.Exec(
@@ -75,6 +93,7 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 			&user.ID,
 			&user.Name,
 			&user.EmployeeId,
+			&user.Phone,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -96,6 +115,7 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 	err := r.db.QueryRow(query, idStr).Scan(
 		&user.ID,
 		&user.Name,
+		&user.Phone,
 		&user.EmployeeId,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -113,13 +133,14 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 func (r *UserRepository) Update(user *models.User) error {
 	query := `
 		UPDATE users
-		SET name = ?, employee_id = ?, updated_at = ?
+		SET name = ?, employee_id = ?, phone = ?, updated_at = ?
 		WHERE id = ?
 	`
 	now := time.Now()
 	_, err := r.db.Exec(
 		query,
 		user.Name,
+		user.Phone,
 		user.EmployeeId,
 		now,
 		user.ID,

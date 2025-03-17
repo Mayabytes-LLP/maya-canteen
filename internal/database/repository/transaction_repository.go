@@ -39,7 +39,7 @@ func (r *TransactionRepository) InitTable() error {
 func (r *TransactionRepository) Create(transaction *models.Transaction) error {
 	query := `
 		INSERT INTO transactions (user_id, amount, description, transaction_type, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	result, err := r.db.Exec(
@@ -147,10 +147,10 @@ func (r *TransactionRepository) Delete(id int64) error {
 }
 
 // GetByUserID retrieves all transactions for a specific user
-func (r *TransactionRepository) GetByUserID(userID int64) ([]models.EployeeTransaction, error) {
+func (r *TransactionRepository) GetByUserID(userID int64) ([]models.EmployeeTransaction, error) {
 	query := `
         SELECT users.id, users.name, users.employee_id
-        WHERE users.id = ? 
+        WHERE users.id = ?
         FROM users
         LEFT JOIN transactions ON users.id = transactions.user_id
         ORDER BY created_at DESC
@@ -162,9 +162,9 @@ func (r *TransactionRepository) GetByUserID(userID int64) ([]models.EployeeTrans
 	}
 	defer rows.Close()
 
-	var transactions []models.EployeeTransaction
+	var transactions []models.EmployeeTransaction
 	for rows.Next() {
-		var transaction models.EployeeTransaction
+		var transaction models.EmployeeTransaction
 		err := rows.Scan(
 			&transaction.ID,
 			&transaction.UserID,
@@ -249,7 +249,7 @@ func (r *TransactionRepository) GetLatest(limit int) ([]models.Transaction, erro
 // GetUsersBalances retrieves the total balance for each user
 func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error) {
 	query := `
-        SELECT users.id, users.name, users.employee_id,
+        SELECT users.id, users.name, users.employee_id, users.phone,
                COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
         FROM users
         LEFT JOIN transactions ON users.id = transactions.user_id
@@ -273,7 +273,7 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 	var balances []models.UserBalance
 	for rows.Next() {
 		var balance models.UserBalance
-		err := rows.Scan(&balance.UserID, &balance.UserName, &balance.EmployeeID, &balance.Balance)
+		err := rows.Scan(&balance.UserID, &balance.UserName, &balance.EmployeeID, &balance.Phone, &balance.Balance)
 		if err != nil {
 			log.Printf("Error scanning row: %v", err)
 			return nil, err
