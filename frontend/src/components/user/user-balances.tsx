@@ -59,7 +59,7 @@ const formSchema = z.object({
       {
         message:
           "Invalid phone number format. Expected format: +923XXXXXXXXX or 03XXXXXXXXX",
-      }
+      },
     )
     .transform((val) => (val.startsWith("0") ? `+92${val.slice(1)}` : val)),
 });
@@ -155,8 +155,8 @@ export default function UserBalances({
                 employee_id: data.employee_id,
                 phone: data.phone,
               }
-            : user
-        )
+            : user,
+        ),
       );
 
       toast.success("User updated successfully");

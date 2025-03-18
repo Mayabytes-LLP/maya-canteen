@@ -90,6 +90,7 @@ export default function UserList({ refreshTrigger = 0 }: UserListProps) {
         id: editUser.id,
         name: editName,
         employee_id: editEmployeeId,
+        phone: editUser.phone,
       });
 
       // Update the local state
@@ -97,8 +98,8 @@ export default function UserList({ refreshTrigger = 0 }: UserListProps) {
         users.map((user) =>
           user.id === editUser.id
             ? { ...user, name: editName, employee_id: editEmployeeId }
-            : user,
-        ),
+            : user
+        )
       );
 
       toast.success("User updated successfully");

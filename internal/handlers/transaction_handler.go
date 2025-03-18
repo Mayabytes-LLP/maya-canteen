@@ -160,7 +160,27 @@ func (h *TransactionHandler) GetTransactionsByUserID(w http.ResponseWriter, r *h
 		return
 	}
 
-	transactions, err := h.DB.GetTransactionsByUserID(userID)
+	// Get limit from query parameter, default to 10 if not provided
+	limitStr := r.URL.Query().Get("limit")
+	limit := 10 // Default limit
+
+	if limitStr != "" {
+		parsedLimit, err := strconv.Atoi(limitStr)
+		if err != nil {
+			h.HandleError(w, errors.InvalidInput("Invalid limit parameter. Must be a number."))
+			return
+		}
+
+		// Ensure limit is positive
+		if parsedLimit <= 0 {
+			h.HandleError(w, errors.InvalidInput("Limit must be a positive number."))
+			return
+		}
+
+		limit = parsedLimit
+	}
+
+	transactions, err := h.DB.GetTransactionsByUserID(userID, limit)
 	if err != nil {
 		h.HandleError(w, errors.Internal(err))
 		return

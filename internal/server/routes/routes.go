@@ -2,6 +2,7 @@ package routes
 
 import (
 	"log"
+	"maya-canteen/frontend"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/middleware"
 	"net/http"
@@ -28,7 +29,7 @@ func RegisterRoutes(db database.Service) http.Handler {
 	// Apply middleware to HTTP routes
 	httpHandlerWithMiddleware := middleware.Chain(router, middleware.CORS(), middleware.Logger(), middleware.Recover())
 
-	return httpHandlerWithMiddleware
+	return frontend.ServeStaticFiles(httpHandlerWithMiddleware)
 }
 
 // initDatabaseTables initializes all database tables

@@ -33,7 +33,6 @@ import { formatDate, formatPrice } from "@/lib/utils";
 import {
   Transaction,
   transactionService,
-  User,
 } from "@/services/transaction-service";
 import { Info, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import DateRangeFilter from "./date-range-filter";
@@ -48,11 +47,10 @@ export default function TransactionList({
   refreshTrigger = 0,
 }: TransactionListProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFiltered, setIsFiltered] = useState(false);
 
-  const { admin } = useContext(AppContext);
+  const { admin, currentUser } = useContext(AppContext);
 
   // CRUD state management
   const [selectedTransaction, setSelectedTransaction] =
@@ -74,13 +72,14 @@ export default function TransactionList({
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
+      if (!currentUser) return;
       try {
-        const [transactionsData, usersData] = await Promise.all([
-          transactionService.getLatestTransactions(limit),
-          transactionService.getAllUsers(),
-        ]);
+        const transactionsData =
+          await transactionService.getTransactionsByUserId(
+            currentUser?.id.toString(),
+            limit
+          );
         setTransactions(transactionsData ?? []);
-        setUsers(usersData ?? []);
         setIsFiltered(false);
       } catch (error) {
         toast.error("Failed to load transactions");
@@ -91,7 +90,7 @@ export default function TransactionList({
     };
 
     fetchData();
-  }, [limit, refreshTrigger]);
+  }, [limit, refreshTrigger, currentUser]);
 
   // Handler for when date range filter loads transactions
   const handleFilteredTransactions = (filteredTransactions: Transaction[]) => {
@@ -102,8 +101,10 @@ export default function TransactionList({
   // Reset filter and load latest transactions
   const handleResetFilter = async () => {
     setLoading(true);
+    if (!currentUser) return;
     try {
-      const transactionsData = await transactionService.getLatestTransactions(
+      const transactionsData = await transactionService.getTransactionsByUserId(
+        currentUser?.id.toString(),
         limit
       );
       setTransactions(transactionsData);
@@ -115,12 +116,6 @@ export default function TransactionList({
     } finally {
       setLoading(false);
     }
-  };
-
-  // Helper function to get user name by ID
-  const getUserName = (userId: number): string => {
-    const user = users.find((u) => u.id === userId);
-    return user ? user.name : "Unknown User";
   };
 
   // Format transaction amount with currency symbol
@@ -241,9 +236,7 @@ export default function TransactionList({
                 className="flex items-center justify-between border-b pb-2"
               >
                 <div className="space-y-1">
-                  <p className="font-medium">
-                    {getUserName(transaction.user_id)}
-                  </p>
+                  <p className="font-medium">{currentUser?.name || "User"}</p>
                   <p className="text-sm text-muted-foreground">
                     {transaction.description}
                   </p>
@@ -315,7 +308,7 @@ export default function TransactionList({
                   <p className="text-sm font-medium text-muted-foreground">
                     User
                   </p>
-                  <p>{getUserName(selectedTransaction.user_id)}</p>
+                  <p>{currentUser?.name || "User"}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
@@ -389,9 +382,9 @@ export default function TransactionList({
             <div className="grid gap-4 py-4">
               <div className="flex items-center gap-4">
                 <Label htmlFor="user" className="w-[120px]">
-                  User
+                  User {editTransaction.user_id}
                 </Label>
-                <p>{getUserName(editTransaction.user_id)}</p>
+                <p>{editTransaction.user_name}</p>
               </div>
 
               <div className="flex items-center gap-4">

@@ -30,7 +30,7 @@ type TransactionRepositoryInterface interface {
 	Get(id int64) (*models.Transaction, error)
 	Update(transaction *models.Transaction) error
 	Delete(id int64) error
-	GetByUserID(userID int64) ([]models.EmployeeTransaction, error)
+	GetByUserID(userID int64, limit int) ([]models.EmployeeTransaction, error)
 	GetByDateRange(startDate, endDate time.Time) ([]models.Transaction, error)
 	GetLatest(limit int) ([]models.Transaction, error)
 	GetUsersBalances() ([]models.UserBalance, error)

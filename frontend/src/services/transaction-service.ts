@@ -44,7 +44,7 @@ export interface UserBalance {
 }
 
 // Using Vite's proxy instead of hardcoded URL
-const API_BASE = "/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
 
 export const transactionService = {
   async getAllTransactions(): Promise<Transaction[]> {
@@ -233,8 +233,14 @@ export const transactionService = {
     }
   },
 
-  async getTransactionsByUserId(userId: string): Promise<Transaction[]> {
-    const response = await fetch(`${API_BASE}/users/${userId}/transactions`);
+  // default limit 10
+  async getTransactionsByUserId(
+    userId: string,
+    limit = 10
+  ): Promise<Transaction[]> {
+    const response = await fetch(
+      `${API_BASE}/users/${userId}/transactions?limit=${limit}`
+    );
     if (!response.ok) {
       throw new Error("Failed to fetch user transactions");
     }

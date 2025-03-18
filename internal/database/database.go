@@ -45,7 +45,7 @@ type Service interface {
 	GetTransaction(id int64) (*models.Transaction, error)
 	UpdateTransaction(transaction *models.Transaction) error
 	DeleteTransaction(id int64) error
-	GetTransactionsByUserID(userID int64) ([]models.EmployeeTransaction, error)
+	GetTransactionsByUserID(userID int64, limit int) ([]models.EmployeeTransaction, error)
 	GetTransactionsByDateRange(startDate, endDate time.Time) ([]models.Transaction, error)
 	GetUsersBalances() ([]models.UserBalance, error)
 
@@ -226,8 +226,8 @@ func (s *service) DeleteTransaction(id int64) error {
 	return s.transactionRepository.Delete(id)
 }
 
-func (s *service) GetTransactionsByUserID(userID int64) ([]models.EmployeeTransaction, error) {
-	return s.transactionRepository.GetByUserID(userID)
+func (s *service) GetTransactionsByUserID(userID int64, limit int) ([]models.EmployeeTransaction, error) {
+	return s.transactionRepository.GetByUserID(userID, limit)
 }
 
 func (s *service) GetTransactionsByDateRange(startDate, endDate time.Time) ([]models.Transaction, error) {

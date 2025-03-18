@@ -9,9 +9,24 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 )
+
+// Setup database path to be configurable, default to current directory
+func setupDBPath() string {
+	dbPath := os.Getenv("BLUEPRINT_DB_URL")
+	if dbPath == "" {
+		// Default to current directory if not specified
+		executablePath, err := os.Executable()
+		if err != nil {
+			log.Fatal("Failed to get executable path:", err)
+		}
+		return filepath.Join(filepath.Dir(executablePath), "db", "canteen.db")
+	}
+	return dbPath
+}
 
 func setupLogFile(filename string) (*os.File, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
@@ -52,6 +67,10 @@ func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, done chan bool)
 
 func main() {
 	logFile, err := setupLogFile("zk_events.log")
+
+	// Set the database path
+	os.Setenv("BLUEPRINT_DB_URL", setupDBPath())
+
 	if err != nil {
 		log.Fatalf("Failed to open log file: %v", err)
 	}

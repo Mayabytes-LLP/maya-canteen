@@ -147,17 +147,19 @@ func (r *TransactionRepository) Delete(id int64) error {
 }
 
 // GetByUserID retrieves all transactions for a specific user
-func (r *TransactionRepository) GetByUserID(userID int64) ([]models.EmployeeTransaction, error) {
+func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.EmployeeTransaction, error) {
 	log.Printf("GetByUserID called with userID: %d", userID)
+	log.Printf("Limit: %d", limit)
 	query := `
-  SELECT transactions.id, transactions.user_id, users.name, users.employee_id, transactions.id, transactions.amount, transactions.description, transactions.transaction_type, transactions.created_at, transactions.updated_at
-  FROM transactions
-  LEFT JOIN users ON transactions.user_id = users.id
-  WHERE users.employee_id = ?
-  ORDER BY transactions.created_at DESC;
+	  SELECT transactions.id, transactions.user_id, users.name, users.employee_id, transactions.id, transactions.amount, transactions.description, transactions.transaction_type, transactions.created_at, transactions.updated_at
+	  FROM transactions
+	  LEFT JOIN users ON transactions.user_id = users.id
+	  WHERE users.employee_id = ?
+	  ORDER BY transactions.created_at DESC;
+		LIMIT ?
 	`
 	log.Printf("Executing query: %s", query)
-	rows, err := r.db.Query(query, userID)
+	rows, err := r.db.Query(query, userID, limit)
 	if err != nil {
 		log.Printf("Error executing query: %v", err)
 		return nil, err
