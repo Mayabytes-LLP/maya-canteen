@@ -3,6 +3,16 @@ import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
   Table,
   TableBody,
   TableCell,
@@ -15,27 +25,46 @@ import {
   UserBalance,
   transactionService,
 } from "@/services/transaction-service";
-import { Button } from "../ui/button";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { CreditCard, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { AppContext } from "../canteen-provider";
+import { Button } from "../ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
-  DialogHeader,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import UserTransactions from "./user-transactions";
-import { Label } from "@/components/ui/label";
-import { AppContext } from "../canteen-provider";
+
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+// Form validation schema
+const formSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
+  phone: z
+    .string()
+    .trim()
+    .refine(
+      (val) => /^0[3-9][0-9]{9}$/.test(val) || /^\+92[0-9]{10}$/.test(val),
+      {
+        message:
+          "Invalid phone number format. Expected format: +923XXXXXXXXX or 03XXXXXXXXX",
+      }
+    )
+    .transform((val) => (val.startsWith("0") ? `+92${val.slice(1)}` : val)),
+});
+
+type FormValues = z.infer<typeof formSchema>;
 
 interface UserBalancesProps {
   refreshTrigger?: number;
@@ -47,17 +76,29 @@ export default function UserBalances({
   const [balances, setBalances] = useState<UserBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<User[]>([]);
-  const [editUser, setEditUser] = useState<User | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editEmployeeId, setEditEmployeeId] = useState("");
+
   const [deleteUserId, setDeleteUserId] = useState<number | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+
+  const [editUser, setEditUser] = useState<User | null>(null);
+
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [openTransactionsDialog, setOpenTransactionsDialog] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { admin } = useContext(AppContext);
+
+  // Initialize form
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: "",
+      employee_id: "",
+      phone: "",
+    },
+  });
 
   useEffect(() => {
     const fetchBalances = async () => {
@@ -78,30 +119,44 @@ export default function UserBalances({
 
   const handleEdit = async (user: UserBalance) => {
     const currentUser = await transactionService.getUser(user.employee_id);
+    if (!currentUser) {
+      toast.error("User not found");
+      return;
+    }
+
     setEditUser(currentUser);
-    setEditName(user.user_name);
-    setEditEmployeeId(user.employee_id);
+
+    form.setValue("name", currentUser.name ?? "");
+    form.setValue("employee_id", currentUser.employee_id ?? "");
+    form.setValue("phone", currentUser.phone ?? "");
     setOpenEditDialog(true);
   };
 
-  const handleUpdate = async () => {
+  const handleUpdate = async (data: FormValues) => {
     if (!editUser) return;
 
     setIsSubmitting(true);
     try {
       await transactionService.updateUser({
         id: editUser.id,
-        name: editName,
-        employee_id: editEmployeeId,
+
+        name: data.name,
+        employee_id: data.employee_id,
+        phone: data.phone,
       });
 
       // Update the local state
       setUsers(
         users.map((user) =>
           user.id === editUser.id
-            ? { ...user, name: editName, employee_id: editEmployeeId }
-            : user,
-        ),
+            ? {
+                ...user,
+                name: data.name,
+                employee_id: data.employee_id,
+                phone: data.phone,
+              }
+            : user
+        )
       );
 
       toast.success("User updated successfully");
@@ -167,6 +222,7 @@ export default function UserBalances({
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Employee ID</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableHead>Balance (PKR)</TableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
@@ -178,6 +234,7 @@ export default function UserBalances({
                       {balance.user_name}
                     </TableCell>
                     <TableCell>{balance.employee_id}</TableCell>
+                    <TableCell>{balance.user_phone}</TableCell>
                     <TableCell>
                       {balance.balance && balance.balance.toFixed(2)}
                     </TableCell>
@@ -232,44 +289,69 @@ export default function UserBalances({
       {/* Edit User Dialog */}
       <Dialog open={openEditDialog} onOpenChange={setOpenEditDialog}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>
-              Update the user information below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input
-                id="name"
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="col-span-3"
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(handleUpdate)}
+              className="space-y-4"
+            >
+              <DialogHeader>
+                <DialogTitle>Edit User</DialogTitle>
+                <DialogDescription>
+                  Update the user information below.
+                </DialogDescription>
+              </DialogHeader>
+
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter user name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="employee_id" className="text-right">
-                Employee ID
-              </Label>
-              <Input
-                id="employee_id"
-                value={editEmployeeId}
-                onChange={(e) => setEditEmployeeId(e.target.value)}
-                className="col-span-3"
+
+              <FormField
+                control={form.control}
+                name="employee_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Employee ID</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter employee ID" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button onClick={handleUpdate} disabled={isSubmitting}>
-              {isSubmitting ? "Updating..." : "Save Changes"}
-            </Button>
-          </DialogFooter>
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number format ( +923452324442 )</FormLabel>
+                    <FormControl>
+                      <Input placeholder="+92 345 2324442" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button variant="outline">Cancel</Button>
+                </DialogClose>
+
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? "Updating..." : "Save Changes"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 

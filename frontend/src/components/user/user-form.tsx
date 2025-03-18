@@ -21,6 +21,17 @@ import { transactionService } from "@/services/transaction-service";
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
+  phone: z
+    .string()
+    .trim()
+    .refine(
+      (val) => /^0[3-9][0-9]{9}$/.test(val) || /^\+92[0-9]{10}$/.test(val),
+      {
+        message:
+          "Invalid phone number format. Expected format: +923XXXXXXXXX or 03XXXXXXXXX",
+      },
+    )
+    .transform((val) => (val.startsWith("0") ? `+92${val.slice(1)}` : val)),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -38,6 +49,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
     defaultValues: {
       name: "",
       employee_id: "",
+      phone: "",
     },
   });
 
@@ -47,6 +59,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
       await transactionService.createUser({
         name: data.name,
         employee_id: data.employee_id,
+        phone: data.phone,
       });
 
       toast.success("User added successfully");
@@ -90,6 +103,19 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
                   <FormLabel>Employee ID</FormLabel>
                   <FormControl>
                     <Input placeholder="Enter employee ID" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="phone"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Phone Number format ( +923452324442 )</FormLabel>
+                  <FormControl>
+                    <Input placeholder="+92 345 2324442" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

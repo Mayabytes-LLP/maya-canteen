@@ -24,7 +24,7 @@ func (r *UserRepository) InitTable() error {
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
 			employee_id TEXT NOT NULL UNIQUE,
-    	phone TEXT NOT NULL UNIQUE,
+    	phone TEXT,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)
@@ -36,17 +36,23 @@ func (r *UserRepository) InitTable() error {
 
 	err1 := r.Create(&models.User{
 		Name:       "Abdul Rafay",
-		EmployeeId: "100058",
+		EmployeeId: "10058",
 		Phone:      "+923452324442",
 	})
 	err2 := r.Create(&models.User{
 		Name:       "Qasim Imtiaz",
-		EmployeeId: "100037",
+		EmployeeId: "10037",
 		Phone:      "+923452565003",
 	})
 
-	if err1 != nil || err2 != nil {
-		fmt.Printf("Error in adding admin possibly already exists to the database %v %v\n", err1, err2)
+	err3 := r.Create(&models.User{
+		Name:       "Syed Kazim Raza",
+		EmployeeId: "10024",
+		Phone:      "+923422949447",
+	})
+
+	if err1 != nil || err2 != nil || err3 != nil {
+		fmt.Printf("Error in adding admin possibly already exists to the database %v\n %v\n %v\n", err1, err2, err3)
 	}
 
 	return nil
@@ -143,8 +149,8 @@ func (r *UserRepository) Update(user *models.User) error {
 	_, err := r.db.Exec(
 		query,
 		user.Name,
-		user.Phone,
 		user.EmployeeId,
+		user.Phone,
 		now,
 		user.ID,
 	)

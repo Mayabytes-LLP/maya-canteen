@@ -148,16 +148,18 @@ func (r *TransactionRepository) Delete(id int64) error {
 
 // GetByUserID retrieves all transactions for a specific user
 func (r *TransactionRepository) GetByUserID(userID int64) ([]models.EmployeeTransaction, error) {
+	log.Printf("GetByUserID called with userID: %d", userID)
 	query := `
-        SELECT users.id, users.name, users.employee_id
-        WHERE users.id = ?
-        FROM users
-        LEFT JOIN transactions ON users.id = transactions.user_id
-        ORDER BY created_at DESC
-    `
-	// query := `SELECT * FROM transactions WHERE id = ? ORDER BY created_at DESC`
+  SELECT transactions.id, transactions.user_id, users.name, users.employee_id, transactions.id, transactions.amount, transactions.description, transactions.transaction_type, transactions.created_at, transactions.updated_at
+  FROM transactions
+  LEFT JOIN users ON transactions.user_id = users.id
+  WHERE users.employee_id = ?
+  ORDER BY transactions.created_at DESC;
+	`
+	log.Printf("Executing query: %s", query)
 	rows, err := r.db.Query(query, userID)
 	if err != nil {
+		log.Printf("Error executing query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -178,10 +180,16 @@ func (r *TransactionRepository) GetByUserID(userID int64) ([]models.EmployeeTran
 			&transaction.UpdatedAt,
 		)
 		if err != nil {
+			log.Printf("Error scanning row: %v", err)
 			return nil, err
 		}
 		transactions = append(transactions, transaction)
 	}
+	if err := rows.Err(); err != nil {
+		log.Printf("Error with rows: %v", err)
+		return nil, err
+	}
+	log.Printf("Fetched transactions: %v", transactions)
 	return transactions, nil
 }
 

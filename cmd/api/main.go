@@ -59,7 +59,6 @@ func main() {
 	eventLogger := log.New(logFile, "", log.LstdFlags)
 
 	apiServer := server.NewServer()
-
 	zkSocket := gozk.NewZK("192.168.1.153", 4370, 0, gozk.DefaultTimezone)
 	if err := zkSocket.Connect(); err != nil {
 		log.Fatalf("Failed to connect to ZK device: %v", err)
@@ -81,6 +80,22 @@ func main() {
 					"timestamp": event.AttendedAt.Format(time.RFC3339),
 				})
 			}
+		}
+		log.Println("Connection lost, attempting to reconnect...")
+		for {
+			if err := zkSocket.Reconnect(); err != nil {
+				log.Printf("Reconnection failed: %v. Retrying in 5 seconds...", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			log.Println("Reconnected to ZK device")
+			c, err = zkSocket.LiveCapture()
+			if err != nil {
+				log.Printf("Failed to restart live capture: %v. Retrying in 5 seconds...", err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			break
 		}
 	}()
 

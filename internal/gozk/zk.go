@@ -529,6 +529,24 @@ func (zk ZK) StopCapture() {
 	zk.capturing <- false
 }
 
+func (zk *ZK) IsConnected() bool {
+	if zk.conn == nil {
+		return false
+	}
+
+	// Try sending a simple command to check the connection
+	_, err := zk.sendCommand(CMD_GET_TIME, nil, 8)
+	return err == nil
+}
+
+func (zk *ZK) Reconnect() error {
+	if zk.IsConnected() {
+		return nil
+	}
+
+	return zk.Connect()
+}
+
 func (zk ZK) Clone() *ZK {
 	return &ZK{
 		host:      zk.host,
