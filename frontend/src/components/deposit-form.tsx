@@ -61,7 +61,7 @@ interface TransactionFormProps {
   onTransactionAdded: () => void;
 }
 
-export default function TransactionForm({
+export default function DepositForm({
   onTransactionAdded,
 }: TransactionFormProps) {
   const [users, setUsers] = useState<User[]>([]);
@@ -111,7 +111,7 @@ export default function TransactionForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0,
+      0
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -131,7 +131,7 @@ export default function TransactionForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId,
+      (product) => product.id === productId
     );
 
     if (!selectedProduct) {
@@ -146,7 +146,7 @@ export default function TransactionForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit,
+      (item) => item.productId === productId && item.single === isSingleUnit
     );
 
     if (existingItemIndex >= 0) {
@@ -210,7 +210,7 @@ export default function TransactionForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`,
+              }`
           )
           .filter(Boolean)
           .join(", ");

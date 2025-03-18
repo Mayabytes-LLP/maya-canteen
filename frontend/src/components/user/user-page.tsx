@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import DepositForm from "@/components/deposit-form";
 import ErrorBoundary from "../error-boundary";
 import UserBalances from "./user-balances";
 import UserForm from "./user-form";
@@ -20,6 +21,9 @@ export default function UserPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <UserForm onUserAdded={handleUserAdded} />
+        </div>
+        <div>
+          <DepositForm onTransactionAdded={handleUserAdded} />
         </div>
         {/* <div> */}
         {/*   <ErrorBoundary> */}
