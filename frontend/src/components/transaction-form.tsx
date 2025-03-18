@@ -26,11 +26,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Trash2 } from "lucide-react";
 
-import {
-  Product,
-  transactionService,
-  User,
-} from "@/services/transaction-service";
+import { Product, transactionService } from "@/services/transaction-service";
 
 import { AppContext } from "./canteen-provider";
 
@@ -45,9 +41,6 @@ interface CartItem {
 
 // Define form schema with Zod
 const formSchema = z.object({
-  user_id: z.string({
-    required_error: "Please select an employee",
-  }),
   product_id: z.string().optional(),
   quantity: z.string().default("1"),
   description: z.string().optional(),
@@ -64,7 +57,6 @@ interface TransactionFormProps {
 export default function TransactionForm({
   onTransactionAdded,
 }: TransactionFormProps) {
-  const [users, setUsers] = useState<User[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -74,7 +66,6 @@ export default function TransactionForm({
   const { admin, currentUser } = useContext(AppContext);
 
   const defaultValues: FormValues = {
-    user_id: "",
     product_id: "",
     quantity: "1",
     description: "",
@@ -88,18 +79,14 @@ export default function TransactionForm({
     defaultValues: defaultValues,
   });
 
-  // Fetch users and products on component mount
+  // Fetch products on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [usersData, productsData] = await Promise.all([
-          transactionService.getAllUsers(),
-          transactionService.getAllProducts(),
-        ]);
-        setUsers(usersData ?? []);
+        const productsData = await transactionService.getAllProducts();
         setProducts(productsData ?? []);
       } catch (error) {
-        toast.error("Failed to load data");
+        toast.error("Failed to load products");
         console.error(error);
       }
     };
@@ -111,7 +98,7 @@ export default function TransactionForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0,
+      0
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -131,7 +118,7 @@ export default function TransactionForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId,
+      (product) => product.id === productId
     );
 
     if (!selectedProduct) {
@@ -146,7 +133,7 @@ export default function TransactionForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit,
+      (item) => item.productId === productId && item.single === isSingleUnit
     );
 
     if (existingItemIndex >= 0) {
@@ -185,7 +172,7 @@ export default function TransactionForm({
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
     if (!currentUser?.id) {
-      toast.error("Please select an employee");
+      toast.error("No active user. Please scan first.");
       return;
     }
     if (data.transaction_type === "purchase" && cartItems.length === 0) {
@@ -210,7 +197,7 @@ export default function TransactionForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`,
+              }`
           )
           .filter(Boolean)
           .join(", ");
@@ -226,7 +213,7 @@ export default function TransactionForm({
       }
 
       const transaction = {
-        user_id: currentUser.id, // Convert to number as backend expects
+        user_id: currentUser.id, // Always use current user's ID
         amount: finalAmount,
         description: description,
         transaction_type: data.transaction_type,
@@ -245,7 +232,7 @@ export default function TransactionForm({
     }
   };
 
-  if ((!users || !products) && (users.length === 0 || products.length === 0)) {
+  if (!products || products.length === 0) {
     return <div>Loading...</div>;
   }
 
@@ -260,6 +247,7 @@ export default function TransactionForm({
             <FormField
               control={form.control}
               name="transaction_type"
+              disabled={!admin}
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Transaction Type</FormLabel>
@@ -284,33 +272,16 @@ export default function TransactionForm({
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="user_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Employee</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select employee" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem
-                          key={user.id.toString()}
-                          value={user.id.toString()}
-                        >
-                          {user.name} ({user.employee_id})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {currentUser && (
+              <div className="p-4 bg-muted rounded-md">
+                <p>
+                  Current User:{" "}
+                  <strong>
+                    {currentUser.name} ({currentUser.employee_id})
+                  </strong>
+                </p>
+              </div>
+            )}
 
             {form.watch("transaction_type") === "deposit" ? (
               <FormField
@@ -333,7 +304,6 @@ export default function TransactionForm({
                 )}
               />
             ) : (
-              // Show product selection and cart only for purchase
               <>
                 <div className="flex space-x-4">
                   <FormField
@@ -497,6 +467,7 @@ export default function TransactionForm({
               className="w-full"
               disabled={
                 isSubmitting ||
+                !currentUser ||
                 (form.watch("transaction_type") === "purchase" &&
                   cartItems.length === 0) ||
                 (form.watch("transaction_type") === "deposit" &&
