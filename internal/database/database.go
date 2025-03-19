@@ -72,22 +72,33 @@ var (
 )
 
 func New() Service {
-	// Reuse Connection
 	if dbInstance != nil {
 		return dbInstance
 	}
 
 	if dburl == "" {
-		dburl = "file:./db/canteen.db"
+		// d drive and database folder with filename canteen.db
+		dburl = "D:/database/canteen.db"
 	}
 
-	// check if path is absolute or just contain the file name example ./db/cateen.db if db folder does not exist create it
-	dbPath := dburl[:strings.LastIndex(dburl, "/")]
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		log.Println("Creating DB Path", dbPath)
-		os.MkdirAll(dbPath, os.ModePerm)
+	// Check if directory needs to be created
+	var dbPath string
+	lastSlashIndex := strings.LastIndex(dburl, "/")
+	if lastSlashIndex != -1 {
+		// Extract the directory path only if a slash exists
+		dbPath = dburl[:lastSlashIndex]
+		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+			log.Println("Creating DB Path", dbPath)
+			err = os.MkdirAll(dbPath, os.ModePerm)
+			if err != nil {
+				log.Fatalf("Failed to create database directory: %v", err)
+			}
+		} else {
+			log.Println("DB Path exists at", dbPath)
+		}
 	} else {
-		log.Println("DB Path exists at ", dbPath)
+		// No directory in path, using current directory
+		log.Println("No directory specified in DB path, using current directory")
 	}
 
 	log.Println("DB URL", dburl)

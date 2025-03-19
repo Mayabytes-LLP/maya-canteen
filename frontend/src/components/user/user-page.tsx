@@ -1,7 +1,6 @@
 import { useState } from "react";
 
-import DepositForm from "@/components/deposit-form";
-import ErrorBoundary from "../error-boundary";
+import ErrorBoundary from "@/components/error-boundary";
 import UserBalances from "./user-balances";
 import UserForm from "./user-form";
 

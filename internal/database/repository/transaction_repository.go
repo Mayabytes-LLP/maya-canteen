@@ -151,14 +151,23 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 	log.Printf("GetByUserID called with userID: %d", userID)
 	log.Printf("Limit: %d", limit)
 	query := `
-	  SELECT users.name, users.department, users.employee_id, transactions.id, transactions.user_id, transactions.id, transactions.amount, transactions.description, transactions.transaction_type, transactions.created_at, transactions.updated_at
+	  SELECT 
+        users.name, 
+        users.employee_id, 
+        users.department, 
+        transactions.id, 
+        transactions.user_id, 
+        transactions.amount, 
+        transactions.description, 
+        transactions.transaction_type, 
+        transactions.created_at, 
+        transactions.updated_at
 	  FROM transactions
 	  LEFT JOIN users ON transactions.user_id = users.id
 	  WHERE users.employee_id = ?
-	  ORDER BY transactions.created_at DESC;
-		LIMIT ?
+	  ORDER BY transactions.created_at DESC
+		LIMIT ?;
 	`
-	log.Printf("Executing query: %s", query)
 	rows, err := r.db.Query(query, userID, limit)
 	if err != nil {
 		log.Printf("Error executing query: %v", err)
@@ -170,12 +179,11 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 	for rows.Next() {
 		var transaction models.EmployeeTransaction
 		err := rows.Scan(
-			&transaction.ID,
-			&transaction.UserID,
 			&transaction.UserName,
 			&transaction.EmployeeID,
 			&transaction.Department,
 			&transaction.TransactionID,
+			&transaction.UserID,
 			&transaction.Amount,
 			&transaction.Description,
 			&transaction.TransactionType,
@@ -192,7 +200,6 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 		log.Printf("Error with rows: %v", err)
 		return nil, err
 	}
-	log.Printf("Fetched transactions: %v", transactions)
 	return transactions, nil
 }
 
