@@ -151,7 +151,7 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 	log.Printf("GetByUserID called with userID: %d", userID)
 	log.Printf("Limit: %d", limit)
 	query := `
-	  SELECT transactions.id, transactions.user_id, users.name, users.employee_id, transactions.id, transactions.amount, transactions.description, transactions.transaction_type, transactions.created_at, transactions.updated_at
+	  SELECT users.name, users.department, users.employee_id, transactions.id, transactions.user_id, transactions.id, transactions.amount, transactions.description, transactions.transaction_type, transactions.created_at, transactions.updated_at
 	  FROM transactions
 	  LEFT JOIN users ON transactions.user_id = users.id
 	  WHERE users.employee_id = ?
@@ -174,6 +174,7 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 			&transaction.UserID,
 			&transaction.UserName,
 			&transaction.EmployeeID,
+			&transaction.Department,
 			&transaction.TransactionID,
 			&transaction.Amount,
 			&transaction.Description,
@@ -259,7 +260,7 @@ func (r *TransactionRepository) GetLatest(limit int) ([]models.Transaction, erro
 // GetUsersBalances retrieves the total balance for each user
 func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error) {
 	query := `
-        SELECT users.id, users.name, users.employee_id, users.phone,
+        SELECT users.id, users.name, users.employee_id, users.department, users.phone,
                COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
         FROM users
         LEFT JOIN transactions ON users.id = transactions.user_id
@@ -283,7 +284,7 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 	var balances []models.UserBalance
 	for rows.Next() {
 		var balance models.UserBalance
-		err := rows.Scan(&balance.UserID, &balance.UserName, &balance.EmployeeID, &balance.Phone, &balance.Balance)
+		err := rows.Scan(&balance.UserID, &balance.UserName, &balance.EmployeeID, &balance.Department, &balance.Phone, &balance.Balance)
 		if err != nil {
 			log.Printf("Error scanning row: %v", err)
 			return nil, err

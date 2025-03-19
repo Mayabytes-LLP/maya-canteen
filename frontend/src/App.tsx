@@ -22,6 +22,7 @@ import {
 } from "./components/ui/form";
 import { Input } from "./components/ui/input";
 import { transactionService } from "./services/transaction-service";
+import TransactionsPage from "./components/transactions-page";
 
 // Form validation schema
 const formSchema = z.object({
@@ -97,6 +98,12 @@ function App() {
                   >
                     Users
                   </button>
+                  <button
+                    onClick={() => setCurrentPage("transactions")}
+                    className={navigationMenuTriggerStyle()}
+                  >
+                    Transactions
+                  </button>
                 </div>
               )}
               <div className="ml-auto flex items-center">
@@ -110,6 +117,8 @@ function App() {
         {currentPage === "canteen" && <CanteenPage />}
         {currentPage === "products" && <ProductPage />}
         {currentPage === "users" && <UserPage />}
+
+        {currentPage === "transactions" && <TransactionsPage />}
 
         {currentPage === "screenSaver" && !showLogin && (
           <div

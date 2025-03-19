@@ -23,6 +23,7 @@ func (r *UserRepository) InitTable() error {
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
+			department TEXT NOT NULL,
 			employee_id TEXT NOT NULL UNIQUE,
     	phone TEXT,
 			created_at DATETIME NOT NULL,
@@ -37,17 +38,20 @@ func (r *UserRepository) InitTable() error {
 	err1 := r.Create(&models.User{
 		Name:       "Abdul Rafay",
 		EmployeeId: "10058",
+		Department: "Development",
 		Phone:      "+923452324442",
 	})
 	err2 := r.Create(&models.User{
 		Name:       "Qasim Imtiaz",
 		EmployeeId: "10037",
+		Department: "Development",
 		Phone:      "+923452565003",
 	})
 
 	err3 := r.Create(&models.User{
 		Name:       "Syed Kazim Raza",
 		EmployeeId: "10024",
+		Department: "Operations",
 		Phone:      "+923422949447",
 	})
 
@@ -61,14 +65,15 @@ func (r *UserRepository) InitTable() error {
 // Create inserts a new user into the database
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
-		INSERT INTO users (name, employee_id, phone, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?)
+		INSERT INTO users (name, employee_id, department, phone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	result, err := r.db.Exec(
 		query,
 		user.Name,
 		user.EmployeeId,
+		user.Department,
 		user.Phone,
 		now,
 		now,
@@ -88,7 +93,7 @@ func (r *UserRepository) Create(user *models.User) error {
 
 // GetAll retrieves all users from the database
 func (r *UserRepository) GetAll() ([]models.User, error) {
-	query := `SELECT * FROM users ORDER BY name ASC`
+	query := `SELECT id, name, employee_id, department, phone, created_at, updated_at FROM users ORDER BY name ASC`
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -102,6 +107,7 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 			&user.ID,
 			&user.Name,
 			&user.EmployeeId,
+			&user.Department,
 			&user.Phone,
 			&user.CreatedAt,
 			&user.UpdatedAt,
@@ -119,12 +125,13 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 	fmt.Println("Get user by ID", id)
 	// make sure id int has 5 digits
 	idStr := fmt.Sprintf("%05d", id)
-	query := `SELECT * FROM users WHERE employee_id = ?`
+	query := `SELECT id, name, employee_id, department, phone, created_at, updated_at FROM users WHERE employee_id = ?`
 	var user models.User
 	err := r.db.QueryRow(query, idStr).Scan(
 		&user.ID,
 		&user.Name,
 		&user.EmployeeId,
+		&user.Department,
 		&user.Phone,
 		&user.CreatedAt,
 		&user.UpdatedAt,
@@ -133,6 +140,7 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 		return nil, nil
 	}
 	if err != nil {
+		fmt.Println("Error in getting user by ID", err)
 		return nil, err
 	}
 	return &user, nil
@@ -142,7 +150,7 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 func (r *UserRepository) Update(user *models.User) error {
 	query := `
 		UPDATE users
-		SET name = ?, employee_id = ?, phone = ?, updated_at = ?
+		SET name = ?, employee_id = ?, department = ?, phone = ?, updated_at = ?
 		WHERE id = ?
 	`
 	now := time.Now()
@@ -150,6 +158,7 @@ func (r *UserRepository) Update(user *models.User) error {
 		query,
 		user.Name,
 		user.EmployeeId,
+		user.Department,
 		user.Phone,
 		now,
 		user.ID,

@@ -77,6 +77,10 @@ func New() Service {
 		return dbInstance
 	}
 
+	if dburl == "" {
+		dburl = "file:./db/canteen.db"
+	}
+
 	// check if path is absolute or just contain the file name example ./db/cateen.db if db folder does not exist create it
 	dbPath := dburl[:strings.LastIndex(dburl, "/")]
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {

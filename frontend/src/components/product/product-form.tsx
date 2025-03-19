@@ -29,7 +29,7 @@ import { Checkbox } from "../ui/checkbox";
 // Form validation schema
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  description: z.string().min(5, "Description must be at least 5 characters"),
+  description: z.string(),
   price: z.coerce.number().positive("Price must be a positive number"),
   type: z.enum(["regular", "cigarette"]),
   is_single_unit: z.boolean().default(false),

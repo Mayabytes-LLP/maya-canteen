@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -24,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 
 import {
   Product,
@@ -32,8 +33,19 @@ import {
   User,
 } from "@/services/transaction-service";
 
+import { cn } from "@/lib/utils";
 import { AppContext } from "./canteen-provider";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Checkbox } from "./ui/checkbox";
 // Define cart item to represent a product and its quantity
 interface CartItem {
   productId: number;
@@ -70,6 +82,8 @@ export default function DepositForm({
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isSingleUnit, setIsSingleUnit] = useState<boolean>(false);
+
+  const [userPopover, setUserPopover] = useState<boolean>(false);
 
   const { admin, currentUser } = useContext(AppContext);
 
@@ -111,7 +125,7 @@ export default function DepositForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0
+      0,
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -131,7 +145,7 @@ export default function DepositForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId
+      (product) => product.id === productId,
     );
 
     if (!selectedProduct) {
@@ -146,7 +160,7 @@ export default function DepositForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit
+      (item) => item.productId === productId && item.single === isSingleUnit,
     );
 
     if (existingItemIndex >= 0) {
@@ -210,7 +224,7 @@ export default function DepositForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`
+              }`,
           )
           .filter(Boolean)
           .join(", ");
@@ -226,7 +240,7 @@ export default function DepositForm({
       }
 
       const transaction = {
-        user_id: currentUser.id, // Convert to number as backend expects
+        user_id: Number(data.user_id),
         amount: finalAmount,
         description: description,
         transaction_type: data.transaction_type,
@@ -268,7 +282,7 @@ export default function DepositForm({
                     defaultValue={field.value}
                   >
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select type" />
                       </SelectTrigger>
                     </FormControl>
@@ -288,25 +302,72 @@ export default function DepositForm({
               control={form.control}
               name="user_id"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col items-stretch">
                   <FormLabel>Employee</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select employee" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {users.map((user) => (
-                        <SelectItem
-                          key={user.id.toString()}
-                          value={user.id.toString()}
+                  <Popover open={userPopover} onOpenChange={setUserPopover}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full justify-between",
+                            !field.value && "text-muted-foreground",
+                          )}
                         >
-                          {user.name} ({user.employee_id})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                          {field.value
+                            ? (() => {
+                                const cu = users.find(
+                                  (user) => user.id.toString() === field.value,
+                                );
+
+                                if (!cu) {
+                                  return ``;
+                                }
+
+                                return `${cu.name} (${cu.department})`;
+                              })()
+                            : "Select User"}
+                          <ChevronsUpDown className="opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search Employee..."
+                          className="h-9"
+                        />
+                        <CommandList>
+                          <CommandEmpty>No Employee found.</CommandEmpty>
+                          <CommandGroup>
+                            {users.map((user) => (
+                              <CommandItem
+                                key={user.id.toString()}
+                                value={user.name.toString()}
+                                onSelect={() => {
+                                  form.setValue("user_id", user.id.toString());
+                                  setUserPopover(false);
+                                }}
+                              >
+                                {user.name} {user.employee_id} (
+                                {user.department})
+                                <Check
+                                  className={cn(
+                                    "ml-auto",
+                                    user.id.toString() === field.value
+                                      ? "opacity-100"
+                                      : "opacity-0",
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormDescription>Select The Employee</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -333,7 +394,6 @@ export default function DepositForm({
                 )}
               />
             ) : (
-              // Show product selection and cart only for purchase
               <>
                 <div className="flex space-x-4">
                   <FormField
@@ -347,7 +407,7 @@ export default function DepositForm({
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                               <SelectValue placeholder="Select product" />
                             </SelectTrigger>
                           </FormControl>
@@ -392,37 +452,48 @@ export default function DepositForm({
                         ) {
                           if (product.type === "cigarette") {
                             return (
-                              <div key={product.id} className="flex flex-col">
+                              <div
+                                key={product.id}
+                                className="flex h-14 items-center flex-col justify-end"
+                              >
                                 <FormItem>
                                   <FormLabel>Single Unit</FormLabel>
                                   <FormControl>
-                                    <input
-                                      type="checkbox"
+                                    <Checkbox
                                       checked={isSingleUnit}
-                                      onChange={(e) =>
-                                        setIsSingleUnit(e.target.checked)
-                                      }
+                                      onCheckedChange={(val) => {
+                                        if (typeof val === "string") {
+                                          setIsSingleUnit(false);
+                                        } else {
+                                          setIsSingleUnit(val);
+                                        }
+                                      }}
                                     />
                                   </FormControl>
                                 </FormItem>
-                                <span className="font-semibold">
-                                  Price: PKR.
+                                <p className="font-semibold">
+                                  <span className="text-xs text-muted-foreground">
+                                    Price: PKR.{" "}
+                                  </span>
                                   {isSingleUnit
                                     ? product.single_unit_price
                                     : product.price}
-                                </span>
+                                </p>
                               </div>
                             );
                           }
                           return (
-                            <div key={product.id} className="flex flex-col">
+                            <div
+                              key={product.id}
+                              className="flex h-14 items-center flex-col justify-end"
+                            >
                               <span className="font-semibold">
                                 Price: PKR.{product.price}
                               </span>
                             </div>
                           );
                         }
-                      })}
+                      })}{" "}
                       <div className="pt-6">
                         <Button
                           type="button"

@@ -29,6 +29,7 @@ import { Trash2 } from "lucide-react";
 import { Product, transactionService } from "@/services/transaction-service";
 
 import { AppContext } from "./canteen-provider";
+import { Checkbox } from "./ui/checkbox";
 
 // Define cart item to represent a product and its quantity
 interface CartItem {
@@ -98,7 +99,7 @@ export default function TransactionForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0
+      0,
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -118,7 +119,7 @@ export default function TransactionForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId
+      (product) => product.id === productId,
     );
 
     if (!selectedProduct) {
@@ -133,7 +134,7 @@ export default function TransactionForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit
+      (item) => item.productId === productId && item.single === isSingleUnit,
     );
 
     if (existingItemIndex >= 0) {
@@ -197,7 +198,7 @@ export default function TransactionForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`
+              }`,
           )
           .filter(Boolean)
           .join(", ");
@@ -233,7 +234,7 @@ export default function TransactionForm({
   };
 
   if (!products || products.length === 0) {
-    return <div>Loading...</div>;
+    return <div className="bg-destructive p-2">No Products Found</div>;
   }
 
   return (
@@ -247,13 +248,13 @@ export default function TransactionForm({
             <FormField
               control={form.control}
               name="transaction_type"
-              disabled={!admin}
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Transaction Type</FormLabel>
                   <Select
                     onValueChange={field.onChange}
                     defaultValue={field.value}
+                    disabled={true}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -317,7 +318,7 @@ export default function TransactionForm({
                           value={field.value}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className="w-full">
                               <SelectValue placeholder="Select product" />
                             </SelectTrigger>
                           </FormControl>
@@ -362,42 +363,54 @@ export default function TransactionForm({
                         ) {
                           if (product.type === "cigarette") {
                             return (
-                              <div key={product.id} className="flex flex-col">
+                              <div
+                                key={product.id}
+                                className="flex h-14 items-center flex-col justify-end"
+                              >
                                 <FormItem>
                                   <FormLabel>Single Unit</FormLabel>
                                   <FormControl>
-                                    <input
-                                      type="checkbox"
+                                    <Checkbox
                                       checked={isSingleUnit}
-                                      onChange={(e) =>
-                                        setIsSingleUnit(e.target.checked)
-                                      }
+                                      onCheckedChange={(val) => {
+                                        if (typeof val === "string") {
+                                          setIsSingleUnit(false);
+                                        } else {
+                                          setIsSingleUnit(val);
+                                        }
+                                      }}
                                     />
                                   </FormControl>
                                 </FormItem>
-                                <span className="font-semibold">
-                                  Price: PKR.
+                                <p className="font-semibold">
+                                  <span className="text-xs text-muted-foreground">
+                                    Price: PKR.{" "}
+                                  </span>
                                   {isSingleUnit
                                     ? product.single_unit_price
                                     : product.price}
-                                </span>
+                                </p>
                               </div>
                             );
                           }
                           return (
-                            <div key={product.id} className="flex flex-col">
+                            <div
+                              key={product.id}
+                              className="flex h-14 items-center flex-col justify-end"
+                            >
                               <span className="font-semibold">
                                 Price: PKR.{product.price}
                               </span>
                             </div>
                           );
                         }
-                      })}
+                      })}{" "}
                       <div className="pt-6">
                         <Button
                           type="button"
                           onClick={handleAddToCart}
-                          variant="outline"
+                          size="lg"
+                          variant="secondary"
                         >
                           Add
                         </Button>
@@ -464,6 +477,7 @@ export default function TransactionForm({
 
             <Button
               type="submit"
+              size="lg"
               className="w-full"
               disabled={
                 isSubmitting ||

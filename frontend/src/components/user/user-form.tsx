@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -16,11 +17,37 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { transactionService } from "@/services/transaction-service";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@components/ui/command";
+
+const Departments = [
+  "HR",
+  "Design",
+  "Sales",
+  "PMO",
+  "Development",
+  "Operations",
+  "Admin",
+] as const;
 
 // Form validation schema
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
+  department: z.enum(Departments),
   phone: z
     .string()
     .trim()
@@ -42,6 +69,7 @@ interface UserFormProps {
 
 export default function UserForm({ onUserAdded }: UserFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userPopover, setUserPopover] = useState(false);
 
   // Initialize form
   const form = useForm<FormValues>({
@@ -59,6 +87,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
       await transactionService.createUser({
         name: data.name,
         employee_id: data.employee_id,
+        department: data.department,
         phone: data.phone,
       });
 
@@ -108,6 +137,68 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="department"
+              render={({ field }) => (
+                <FormItem className="flex flex-col items-stretch">
+                  <FormLabel>Department</FormLabel>
+                  <Popover open={userPopover} onOpenChange={setUserPopover}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          className={cn(
+                            "w-full justify-between",
+                            !field.value && "text-muted-foreground",
+                          )}
+                        >
+                          {field.value || "Select Department"}
+                          <ChevronsUpDown className="opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput
+                          placeholder="Search Employee..."
+                          className="h-9"
+                        />
+                        <CommandList>
+                          <CommandEmpty>No Employee found.</CommandEmpty>
+                          <CommandGroup>
+                            {Departments.map((department) => (
+                              <CommandItem
+                                key={department}
+                                value={department}
+                                onSelect={() => {
+                                  form.setValue("department", department);
+                                  setUserPopover(false);
+                                }}
+                              >
+                                {department}
+                                <Check
+                                  className={cn(
+                                    "ml-auto",
+                                    department === field.value
+                                      ? "opacity-100"
+                                      : "opacity-0",
+                                  )}
+                                />
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <FormDescription>Select The Department</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="phone"

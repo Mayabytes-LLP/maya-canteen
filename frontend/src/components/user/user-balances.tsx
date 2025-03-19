@@ -1,6 +1,21 @@
 import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -45,12 +60,26 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
+import { CopyButton } from "../ui/copy-button";
+
+const Departments = [
+  "HR",
+  "Design",
+  "Sales",
+  "PMO",
+  "Development",
+  "Operations",
+  "Admin",
+] as const;
+
 // Form validation schema
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
+  department: z.enum(Departments),
   phone: z
     .string()
     .trim()
@@ -87,6 +116,7 @@ export default function UserBalances({
   const [openTransactionsDialog, setOpenTransactionsDialog] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userPopover, setUserPopover] = useState(false);
 
   const { admin } = useContext(AppContext);
 
@@ -139,9 +169,9 @@ export default function UserBalances({
     try {
       await transactionService.updateUser({
         id: editUser.id,
-
         name: data.name,
         employee_id: data.employee_id,
+        department: data.department,
         phone: data.phone,
       });
 
@@ -152,10 +182,25 @@ export default function UserBalances({
             ? {
                 ...user,
                 name: data.name,
+                department: data.department,
                 employee_id: data.employee_id,
                 phone: data.phone,
               }
             : user,
+        ),
+      );
+
+      setBalances(
+        balances.map((balance) =>
+          balance.user_id === editUser.id
+            ? {
+                ...balance,
+                user_name: data.name,
+                user_department: data.department,
+                employee_id: data.employee_id,
+                user_phone: data.phone,
+              }
+            : balance,
         ),
       );
 
@@ -221,8 +266,7 @@ export default function UserBalances({
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Employee ID</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead className="">Phone</TableHead>
                   <TableHead>Balance (PKR)</TableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
@@ -231,10 +275,17 @@ export default function UserBalances({
                 {balances.map((balance) => (
                   <TableRow key={balance.user_id}>
                     <TableCell className="font-medium">
-                      {balance.user_name}
+                      {`${balance.user_name} (${balance.user_department})`}
                     </TableCell>
-                    <TableCell>{balance.employee_id}</TableCell>
-                    <TableCell>{balance.user_phone}</TableCell>
+                    <TableCell>
+                      <div className="flex space-x-2">
+                        <span className="p-1 bg-zinc-700 w-28 text-center rounded">
+                          {balance.user_phone}
+                        </span>
+
+                        <CopyButton value={balance.user_phone} />
+                      </div>
+                    </TableCell>
                     <TableCell>
                       {balance.balance && balance.balance.toFixed(2)}
                     </TableCell>
@@ -324,6 +375,67 @@ export default function UserBalances({
                     <FormControl>
                       <Input placeholder="Enter employee ID" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="department"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col items-stretch">
+                    <FormLabel>Department</FormLabel>
+                    <Popover open={userPopover} onOpenChange={setUserPopover}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              "w-full justify-between",
+                              !field.value && "text-muted-foreground",
+                            )}
+                          >
+                            {field.value || "Select Department"}
+                            <ChevronsUpDown className="opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput
+                            placeholder="Search Employee..."
+                            className="h-9"
+                          />
+                          <CommandList>
+                            <CommandEmpty>No Employee found.</CommandEmpty>
+                            <CommandGroup>
+                              {Departments.map((department) => (
+                                <CommandItem
+                                  key={department}
+                                  value={department}
+                                  onSelect={() => {
+                                    form.setValue("department", department);
+                                    setUserPopover(false);
+                                  }}
+                                >
+                                  {department}
+                                  <Check
+                                    className={cn(
+                                      "ml-auto",
+                                      department === field.value
+                                        ? "opacity-100"
+                                        : "opacity-0",
+                                    )}
+                                  />
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>Select The Department</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -4,10 +4,15 @@ import { toast } from "sonner";
 
 export interface AppState {
   admin: boolean;
-  currentPage: "canteen" | "products" | "users" | "screenSaver";
+  currentPage:
+    | "canteen"
+    | "transactions"
+    | "products"
+    | "users"
+    | "screenSaver";
   currentUser: User | null;
   setCurrentPage: (
-    page: "canteen" | "products" | "users" | "screenSaver",
+    page: "canteen" | "products" | "users" | "screenSaver" | "transactions",
   ) => void;
   setCurrentUser: (user: User) => void;
   setAdmin: (admin: boolean) => void;

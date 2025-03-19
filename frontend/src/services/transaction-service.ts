@@ -13,6 +13,7 @@ export interface User {
   id: number;
   name: string;
   employee_id: string;
+  department: string;
   phone: string;
   created_at: string;
   updated_at: string;
@@ -39,6 +40,7 @@ export interface UserBalance {
   user_id: number;
   user_name: string;
   employee_id: string;
+  user_department: string;
   user_phone: string;
   balance: number;
 }
@@ -58,7 +60,7 @@ export const transactionService = {
 
   async getLatestTransactions(limit: number = 10): Promise<Transaction[]> {
     const response = await fetch(
-      `${API_BASE}/transactions/latest?limit=${limit}`
+      `${API_BASE}/transactions/latest?limit=${limit}`,
     );
     if (!response.ok) {
       throw new Error("Failed to fetch latest transactions");
@@ -82,7 +84,7 @@ export const transactionService = {
     transaction: Omit<
       Transaction,
       "id" | "user_name" | "created_at" | "updated_at"
-    >
+    >,
   ): Promise<Transaction> {
     console.log(transaction);
     const response = await fetch(`${API_BASE}/transactions`, {
@@ -100,7 +102,7 @@ export const transactionService = {
   },
 
   async getTransactionsByDateRange(
-    dateRange: DateRangeRequest
+    dateRange: DateRangeRequest,
   ): Promise<Transaction[]> {
     const response = await fetch(`${API_BASE}/transactions/date-range`, {
       method: "POST",
@@ -136,7 +138,7 @@ export const transactionService = {
   },
 
   async createProduct(
-    product: Omit<Product, "id" | "created_at" | "updated_at">
+    product: Omit<Product, "id" | "created_at" | "updated_at">,
   ): Promise<Product> {
     const response = await fetch(`${API_BASE}/products`, {
       method: "POST",
@@ -154,7 +156,7 @@ export const transactionService = {
   },
 
   async createUser(
-    user: Omit<User, "id" | "created_at" | "updated_at">
+    user: Omit<User, "id" | "created_at" | "updated_at">,
   ): Promise<User> {
     const response = await fetch(`${API_BASE}/users`, {
       method: "POST",
@@ -182,7 +184,7 @@ export const transactionService = {
   },
 
   async updateUser(
-    user: Pick<User, "id" | "name" | "employee_id" | "phone">
+    user: Pick<User, "id" | "name" | "employee_id" | "department" | "phone">,
   ): Promise<User> {
     const response = await fetch(`${API_BASE}/users/${user.id}`, {
       method: "PUT",
@@ -208,7 +210,7 @@ export const transactionService = {
   },
 
   async updateTransaction(
-    transaction: Omit<Transaction, "created_at" | "updated_at">
+    transaction: Omit<Transaction, "created_at" | "updated_at">,
   ): Promise<Transaction> {
     const response = await fetch(`${API_BASE}/transactions/${transaction.id}`, {
       method: "PUT",
@@ -236,10 +238,10 @@ export const transactionService = {
   // default limit 10
   async getTransactionsByUserId(
     userId: string,
-    limit = 10
+    limit = 10,
   ): Promise<Transaction[]> {
     const response = await fetch(
-      `${API_BASE}/users/${userId}/transactions?limit=${limit}`
+      `${API_BASE}/users/${userId}/transactions?limit=${limit}`,
     );
     if (!response.ok) {
       throw new Error("Failed to fetch user transactions");
