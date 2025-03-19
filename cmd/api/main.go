@@ -28,6 +28,26 @@ func setupDBPath() string {
 	return dbPath
 }
 
+func setupZKDevice() *gozk.ZK {
+	port := os.Getenv("ZK_PORT")
+	if port == "" {
+		port = "4370"
+	}
+	ip := os.Getenv("ZK_IP")
+	if ip == "" {
+		ip = "192.168.1.153"
+	}
+	timezone := os.Getenv("ZK_TIMEZONE")
+	if timezone == "" {
+		timezone = "0"
+	}
+	zkSocket := gozk.NewZK(ip, 4370, 0, gozk.DefaultTimezone)
+	if err := zkSocket.Connect(); err != nil {
+		log.Fatalf("Failed to connect to ZK device: %v", err)
+	}
+	return zkSocket
+}
+
 func setupLogFile(filename string) (*os.File, error) {
 	file, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
@@ -78,10 +98,7 @@ func main() {
 	eventLogger := log.New(logFile, "", log.LstdFlags)
 
 	apiServer := server.NewServer()
-	zkSocket := gozk.NewZK("192.168.1.153", 4370, 0, gozk.DefaultTimezone)
-	if err := zkSocket.Connect(); err != nil {
-		log.Fatalf("Failed to connect to ZK device: %v", err)
-	}
+	zkSocket := setupZKDevice()
 	log.Println("Zk Device Connected")
 	c, err := zkSocket.LiveCapture()
 	if err != nil {
