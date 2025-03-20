@@ -64,7 +64,7 @@ export default function TransactionForm({
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isSingleUnit, setIsSingleUnit] = useState<boolean>(false);
 
-  const { admin, currentUser } = useContext(AppContext);
+  const { admin, currentUser, setCurrentUser } = useContext(AppContext);
 
   const defaultValues: FormValues = {
     product_id: "",
@@ -225,6 +225,7 @@ export default function TransactionForm({
       form.reset(defaultValues);
       setCartItems([]);
       onTransactionAdded();
+      setCurrentUser(null);
     } catch (error) {
       toast.error("Failed to add transaction");
       console.error(error);

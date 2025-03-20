@@ -106,7 +106,15 @@ function App() {
                   </button>
                 </div>
               )}
-              <div className="ml-auto flex items-center">
+              <div className="ml-auto flex gap-2 items-center">
+                <Button
+                  variant="destructive"
+                  onClick={() => {
+                    setCurrentUser(null);
+                  }}
+                >
+                  Logout {currentUser?.name || "Guest"}
+                </Button>
                 <ModeToggle />
               </div>
             </div>

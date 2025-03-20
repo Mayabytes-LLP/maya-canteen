@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export interface Transaction {
   id: number;
   user_id: number;
@@ -44,6 +46,62 @@ export interface UserBalance {
   user_phone: string;
   balance: number;
 }
+
+export interface UserCSVResponse {
+  success: number;
+  failed: number;
+  errors: string[];
+}
+
+export const Departments = [
+  "Creative Design Dept",
+  "Operations Dept",
+  "Development Dept",
+  "Business Development Dept",
+  "Digital Marketing Dept",
+  "Admin Department",
+  "Sales Department Code Coffee",
+  "Operations",
+  "Human Resources",
+  "IT Support",
+  "Development",
+] as const;
+
+export const zodUserSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
+  department: z.enum(Departments),
+  phone: z
+    .string()
+    .trim()
+    .refine(
+      (val) =>
+        /^0[3-9][0-9]{9}$/.test(val) || // 03XX-XXXXXXX
+        /^\+92[0-9]{10}$/.test(val) || // +92XXXXXXXXXX
+        /^\+1[0-9]{10}$/.test(val) || // +1XXXXXXXXXX
+        /^03[0-9]{2}[-\s]?[0-9]{7}$/.test(val), // 0311-5410355 or 0332 2723005
+      {
+        message:
+          "Invalid phone number format. Expected: 03XXXXXXXXX, +92XXXXXXXXXX, +1XXXXXXXXXX or 0311-XXXXXXX",
+      },
+    )
+    .transform((val) => {
+      // Remove spaces and dashes
+      val = val.replace(/[\s-]/g, "");
+
+      // Handle Pakistan numbers
+      if (val.startsWith("0")) {
+        return `+92${val.slice(1)}`;
+      }
+
+      // Keep existing country codes
+      if (val.startsWith("+")) {
+        return val;
+      }
+
+      return val;
+    }),
+});
 
 // Using Vite's proxy instead of hardcoded URL
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
@@ -186,6 +244,7 @@ export const transactionService = {
   async updateUser(
     user: Pick<User, "id" | "name" | "employee_id" | "department" | "phone">,
   ): Promise<User> {
+    console.log(user);
     const response = await fetch(`${API_BASE}/users/${user.id}`, {
       method: "PUT",
       headers: {
@@ -264,5 +323,22 @@ export const transactionService = {
       console.error("Error fetching users' balances:", error);
       throw error;
     }
+  },
+
+  async uploadUsersCsv(file: File): Promise<UserCSVResponse> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_BASE}/users/upload-csv`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to upload users CSV");
+    }
+
+    const res = await response.json();
+    return res.data;
   },
 };

@@ -14,7 +14,7 @@ export interface AppState {
   setCurrentPage: (
     page: "canteen" | "products" | "users" | "screenSaver" | "transactions",
   ) => void;
-  setCurrentUser: (user: User) => void;
+  setCurrentUser: (user: User | null) => void;
   setAdmin: (admin: boolean) => void;
   ws: React.RefObject<WebSocket | null>;
 }

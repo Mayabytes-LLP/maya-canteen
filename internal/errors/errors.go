@@ -73,6 +73,13 @@ func InvalidInput(message string) *AppError {
 
 // Internal creates a new internal error
 func Internal(err error) *AppError {
+	if err != nil {
+		return &AppError{
+			Err:     err,
+			Message: fmt.Sprintf("An internal error occurred: %v", err),
+			Code:    "INTERNAL_ERROR",
+		}
+	}
 	return &AppError{
 		Err:     ErrInternal,
 		Message: "An internal error occurred",

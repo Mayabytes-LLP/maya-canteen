@@ -16,14 +16,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { transactionService } from "@/services/transaction-service";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@components/ui/popover";
 import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown } from "lucide-react";
+import {
+  Departments,
+  zodUserSchema as formSchema,
+  transactionService,
+} from "@/services/transaction-service";
 import {
   Command,
   CommandEmpty,
@@ -32,34 +30,12 @@ import {
   CommandItem,
   CommandList,
 } from "@components/ui/command";
-
-const Departments = [
-  "HR",
-  "Design",
-  "Sales",
-  "PMO",
-  "Development",
-  "Operations",
-  "Admin",
-] as const;
-
-// Form validation schema
-const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
-  department: z.enum(Departments),
-  phone: z
-    .string()
-    .trim()
-    .refine(
-      (val) => /^0[3-9][0-9]{9}$/.test(val) || /^\+92[0-9]{10}$/.test(val),
-      {
-        message:
-          "Invalid phone number format. Expected format: +923XXXXXXXXX or 03XXXXXXXXX",
-      },
-    )
-    .transform((val) => (val.startsWith("0") ? `+92${val.slice(1)}` : val)),
-});
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -151,7 +127,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
                           role="combobox"
                           className={cn(
                             "w-full justify-between",
-                            !field.value && "text-muted-foreground",
+                            !field.value && "text-muted-foreground"
                           )}
                         >
                           {field.value || "Select Department"}
@@ -183,7 +159,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
                                     "ml-auto",
                                     department === field.value
                                       ? "opacity-100"
-                                      : "opacity-0",
+                                      : "opacity-0"
                                   )}
                                 />
                               </CommandItem>

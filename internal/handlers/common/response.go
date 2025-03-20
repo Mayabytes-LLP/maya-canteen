@@ -6,37 +6,40 @@ import (
 	"net/http"
 )
 
-// Response represents a standard API response
+// Response represents the standard API response structure
 type Response struct {
-	Success bool        `json:"success"`
+	Status  string      `json:"status"`
+	Message string      `json:"message,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
 }
 
-// RespondWithJSON sends a JSON response with the given status code and payload
-func RespondWithJSON(w http.ResponseWriter, statusCode int, payload interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-
-	if err := json.NewEncoder(w).Encode(payload); err != nil {
-		log.Printf("Error encoding JSON response: %v", err)
+// RespondWithJSON writes a JSON response with the given status code and payload
+func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+	response := Response{
+		Status: "success",
+		Data:   payload,
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(response)
 }
 
-// RespondWithError sends an error response with the given status code and error message
-func RespondWithError(w http.ResponseWriter, statusCode int, errorMsg string) {
-	RespondWithJSON(w, statusCode, Response{
-		Success: false,
-		Error:   errorMsg,
-	})
+// RespondWithError writes a JSON error response
+func RespondWithError(w http.ResponseWriter, code int, message string) {
+	response := Response{
+		Status:  "error",
+		Message: message,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(response)
 }
 
-// RespondWithSuccess sends a success response with the given status code and data
-func RespondWithSuccess(w http.ResponseWriter, statusCode int, data interface{}) {
-	RespondWithJSON(w, statusCode, Response{
-		Success: true,
-		Data:    data,
-	})
+// RespondWithSuccess writes a JSON success response with a message
+func RespondWithSuccess(w http.ResponseWriter, code int, data interface{}) {
+	RespondWithJSON(w, code, data)
 }
 
 // RespondWithNotFound sends a 404 Not Found response

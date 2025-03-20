@@ -123,11 +123,9 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 // Get retrieves a single user by ID
 func (r *UserRepository) Get(id int64) (*models.User, error) {
 	fmt.Println("Get user by ID", id)
-	// make sure id int has 5 digits
-	idStr := fmt.Sprintf("%05d", id)
 	query := `SELECT id, name, employee_id, department, phone, created_at, updated_at FROM users WHERE employee_id = ?`
 	var user models.User
-	err := r.db.QueryRow(query, idStr).Scan(
+	err := r.db.QueryRow(query, id).Scan(
 		&user.ID,
 		&user.Name,
 		&user.EmployeeId,
@@ -148,6 +146,7 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 
 // Update updates an existing user
 func (r *UserRepository) Update(user *models.User) error {
+	fmt.Println("Edit user by ID", user)
 	query := `
 		UPDATE users
 		SET name = ?, employee_id = ?, department = ?, phone = ?, updated_at = ?

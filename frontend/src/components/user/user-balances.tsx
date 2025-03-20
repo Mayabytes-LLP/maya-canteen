@@ -1,21 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@components/ui/popover";
-import { cn } from "@/lib/utils";
-import { Check, ChevronsUpDown } from "lucide-react";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@components/ui/command";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -35,13 +20,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import {
+  Departments,
+  zodUserSchema as formSchema,
+  transactionService,
   User,
   UserBalance,
-  transactionService,
 } from "@/services/transaction-service";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@components/ui/popover";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CreditCard, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  CreditCard,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { AppContext } from "../canteen-provider";
@@ -57,41 +65,13 @@ import UserTransactions from "./user-transactions";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
-  FormDescription,
   FormMessage,
 } from "@/components/ui/form";
 import { CopyButton } from "../ui/copy-button";
-
-const Departments = [
-  "HR",
-  "Design",
-  "Sales",
-  "PMO",
-  "Development",
-  "Operations",
-  "Admin",
-] as const;
-
-// Form validation schema
-const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
-  department: z.enum(Departments),
-  phone: z
-    .string()
-    .trim()
-    .refine(
-      (val) => /^0[3-9][0-9]{9}$/.test(val) || /^\+92[0-9]{10}$/.test(val),
-      {
-        message:
-          "Invalid phone number format. Expected format: +923XXXXXXXXX or 03XXXXXXXXX",
-      },
-    )
-    .transform((val) => (val.startsWith("0") ? `+92${val.slice(1)}` : val)),
-});
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -266,7 +246,8 @@ export default function UserBalances({
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead className="">Phone</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Employee ID</TableHead>
                   <TableHead>Balance (PKR)</TableHead>
                   <TableHead className="w-[120px]">Actions</TableHead>
                 </TableRow>
@@ -277,6 +258,7 @@ export default function UserBalances({
                     <TableCell className="font-medium">
                       {`${balance.user_name} (${balance.user_department})`}
                     </TableCell>
+                    <TableCell>{balance.employee_id}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <span className="p-1 bg-zinc-700 w-28 text-center rounded">

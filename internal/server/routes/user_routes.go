@@ -18,4 +18,5 @@ func RegisterUserRoutes(router *mux.Router, db database.Service) {
 	router.HandleFunc("/api/users/{id}", userHandler.GetUser).Methods("GET")
 	router.HandleFunc("/api/users/{id}", userHandler.UpdateUser).Methods("PUT")
 	router.HandleFunc("/api/users/{id}", userHandler.DeleteUser).Methods("DELETE")
+	router.HandleFunc("/api/users/upload-csv", userHandler.UploadUserCSV).Methods("POST")
 }
