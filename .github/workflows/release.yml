@@ -17,7 +17,7 @@ jobs:
             asset_name: maya-canteen-linux
           - os: windows-latest
             output_name: maya-canteen-windows.exe
-            asset_name: maya-canteen-windows
+            asset_name: maya-canteen-windows.exe
           - os: macos-latest
             output_name: maya-canteen-macos
             asset_name: maya-canteen-macos
@@ -73,36 +73,12 @@ jobs:
           fi
           CGO_ENABLED=1 GOARCH=amd64 go build -o ${{ matrix.output_name }} cmd/api/main.go
 
-      - name: Create distribution package for Linux/macOS
-        if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          mkdir -p dist/db
-          mkdir -p dist/frontend/dist
-          cp ${{ matrix.output_name }} dist/
-          cp -r frontend/dist/* dist/frontend/dist/
-          cp .env.example dist/.env
-          touch dist/db/canteen.db
-          cd dist && tar -czf ../${{ matrix.asset_name }}.tar.gz .
-
-      - name: Create distribution package for Windows
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: |
-          New-Item -Path dist\db -ItemType Directory -Force
-          New-Item -Path dist\frontend\dist -ItemType Directory -Force
-          Copy-Item -Path ${{ matrix.output_name }} -Destination dist\
-          Copy-Item -Path frontend\dist\* -Destination dist\frontend\dist\ -Recurse
-          Copy-Item -Path .env.example -Destination dist\.env
-          New-Item -Path dist\db\canteen.db -ItemType File -Force
-          Compress-Archive -Path dist\* -DestinationPath ${{ matrix.asset_name }}.zip
-
       - name: Upload release asset
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ github.event.release.upload_url }}
-          asset_path: ./${{ matrix.asset_name }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
-          asset_name: ${{ matrix.asset_name }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
-          asset_content_type: ${{ matrix.os == 'windows-latest' && 'application/zip' || 'application/gzip' }}
+          asset_path: ./${{ matrix.output_name }}
+          asset_name: ${{ matrix.asset_name }}
+          asset_content_type: application/octet-stream
