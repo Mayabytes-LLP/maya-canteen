@@ -73,7 +73,8 @@ jobs:
           fi
           CGO_ENABLED=1 GOARCH=amd64 go build -o ${{ matrix.output_name }} cmd/api/main.go
 
-      - name: Create distribution package
+      - name: Create distribution package for Linux/macOS
+        if: matrix.os != 'windows-latest'
         shell: bash
         run: |
           mkdir -p dist/db
@@ -82,13 +83,19 @@ jobs:
           cp -r frontend/dist/* dist/frontend/dist/
           cp .env.example dist/.env
           touch dist/db/canteen.db
+          cd dist && tar -czf ../${{ matrix.asset_name }}.tar.gz .
 
-          # Create zip/tar archive based on platform
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            cd dist && zip -r ../${{ matrix.asset_name }}.zip .
-          else
-            cd dist && tar -czf ../${{ matrix.asset_name }}.tar.gz .
-          fi
+      - name: Create distribution package for Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -Path dist\db -ItemType Directory -Force
+          New-Item -Path dist\frontend\dist -ItemType Directory -Force
+          Copy-Item -Path ${{ matrix.output_name }} -Destination dist\
+          Copy-Item -Path frontend\dist\* -Destination dist\frontend\dist\ -Recurse
+          Copy-Item -Path .env.example -Destination dist\.env
+          New-Item -Path dist\db\canteen.db -ItemType File -Force
+          Compress-Archive -Path dist\* -DestinationPath ${{ matrix.asset_name }}.zip
 
       - name: Upload release asset
         uses: actions/upload-release-asset@v1
