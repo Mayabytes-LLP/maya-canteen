@@ -33,7 +33,6 @@ type ZK struct {
 	lastData  []byte
 	disabled  bool
 	capturing chan bool
-	recordCap int
 }
 
 func NewZK(host string, port int, pin int, timezone string) *ZK {
@@ -90,7 +89,7 @@ func (zk *ZK) Connect() error {
 	// 	}
 	// }
 	//
-	log4go.Info("Session ID: %d", zk.sessionID)
+	log.Println("Connected with session_id", zk.sessionID)
 	return nil
 }
 
@@ -331,14 +330,9 @@ func (zk *ZK) GetUsers() error {
 	return nil
 }
 
-func (zk *ZK) LiveCapture() (chan *Attendance, error) {
+func (zk *ZK) LiveCapture(newTimeout time.Duration) (chan *Attendance, error) {
 	if zk.capturing != nil {
 		return nil, errors.New("is capturing")
-	}
-
-	users, err := zk.GetZktecoUsers()
-	if err != nil {
-		return nil, err
 	}
 
 	if err := zk.verifyUser(); err != nil {
@@ -384,13 +378,15 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 			zk.capturing = nil // Reset the capturing flag
 		}()
 
+		zk.conn.SetReadDeadline(time.Now().Add(newTimeout))
+
 		for {
 			select {
 			case <-zk.capturing:
 				return
 			default:
 				data, err := zk.receiveData(1032, KeepAlivePeriod)
-				log4go.Info("Zk Device Received data %v", len(data))
+				log4go.Info("Zk Device Received data with length: %v", len(data))
 				if err != nil {
 					if strings.Contains(err.Error(), "timeout") {
 						// Timeout is expected, send keep-alive
@@ -416,7 +412,7 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 					log4go.Info("Empty data received, continuing")
 					continue
 				}
-
+				// size := mustUnpack([]string{"H", "H", "I"}, data[:8])[2].(int)
 				header := mustUnpack([]string{"H", "H", "H", "H"}, data[8:16])
 				data = data[16:]
 
@@ -425,114 +421,33 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 					continue
 				}
 
-				// Print the data in a more readable format for debugging
-				dataStr := ""
-				for _, b := range data {
-					if b >= 32 && b <= 126 { // Printable ASCII
-						dataStr += string(b)
-					} else {
-						dataStr += fmt.Sprintf("\\x%02x", b)
-					}
-				}
-				log4go.Info("Data as string:", dataStr)
-				for len(data) >= 10 {
-					var userID string
-					var status, punch int
-					var timehex string
-					var unpack []interface{}
+				for len(data) >= 12 {
+					unpack := []interface{}{}
 
-					if len(data) == 10 {
-						unpack = mustUnpack([]string{"H", "B", "B", "6s"}, data)
-						userID = fmt.Sprintf("%d", unpack[0].(int))
-						status = unpack[1].(int)
-						punch = unpack[2].(int)
-						timehex = unpack[3].(string)
-						data = data[10:]
-					} else if len(data) == 12 {
+					if len(data) == 12 {
 						unpack = mustUnpack([]string{"I", "B", "B", "6s"}, data)
-						userID = fmt.Sprintf("%d", unpack[0].(int))
-						status = unpack[1].(int)
-						punch = unpack[2].(int)
-						timehex = unpack[3].(string)
 						data = data[12:]
-					} else if len(data) == 14 {
-						unpack = mustUnpack([]string{"H", "B", "B", "6s", "4s"}, data)
-						userID = fmt.Sprintf("%d", unpack[0].(int))
-						status = unpack[1].(int)
-						punch = unpack[2].(int)
-						timehex = unpack[3].(string)
-						data = data[14:]
 					} else if len(data) == 32 {
 						unpack = mustUnpack([]string{"24s", "B", "B", "6s"}, data[:32])
-						userID = strings.Replace(unpack[0].(string), "\x00", "", -1)
-						status = unpack[1].(int)
-						punch = unpack[2].(int)
-						timehex = unpack[3].(string)
 						data = data[32:]
 					} else if len(data) == 36 {
-						// First try to parse as a 24-byte user ID format
 						unpack = mustUnpack([]string{"24s", "B", "B", "6s", "4s"}, data[:36])
-						rawUserID := unpack[0].(string)
-						// Check if the first few bytes contain ASCII digits (common for numeric user IDs)
-						if rawUserID[0] >= '0' && rawUserID[0] <= '9' {
-							// This appears to be a numeric ID stored as ASCII in the first part
-							// Extract until we hit a null byte or non-numeric character
-							numericPart := ""
-							for i := 0; i < len(rawUserID); i++ {
-								if rawUserID[i] == 0 || !(rawUserID[i] >= '0' && rawUserID[i] <= '9') {
-									break
-								}
-								numericPart += string(rawUserID[i])
-							}
-							if numericPart != "" {
-								userID = numericPart
-							} else {
-								userID = strings.Replace(rawUserID, "\x00", "", -1)
-							}
-						} else {
-							userID = strings.Replace(rawUserID, "\x00", "", -1)
-						}
-						status = unpack[1].(int)
-						punch = unpack[2].(int)
-						timehex = unpack[3].(string)
 						data = data[36:]
-					} else if len(data) == 37 {
-						unpack = mustUnpack([]string{"24s", "B", "B", "6s", "5s"}, data[:37])
-						userID = strings.Replace(unpack[0].(string), "\x00", "", -1)
-						status = unpack[1].(int)
-						punch = unpack[2].(int)
-						timehex = unpack[3].(string)
-						data = data[37:]
 					} else if len(data) >= 52 {
 						unpack = mustUnpack([]string{"24s", "B", "B", "6s", "20s"}, data[:52])
-						userID = strings.Replace(unpack[0].(string), "\x00", "", -1)
-						status = unpack[1].(int)
-						punch = unpack[2].(int)
-						timehex = unpack[3].(string)
 						data = data[52:]
 					}
 
-					timestamp := zk.decodeTimeHex([]byte(timehex))
+					timestamp := zk.decodeTimeHex([]byte(unpack[3].(string)))
 
-					uid := ""
-					// Find matching user by user_id
-					for _, user := range users {
-						if user.Uid == userID {
-							uid = userID
-							break
-						}
-					}
-					if uid == "" {
-						uid = userID
+					userID, err := strconv.ParseInt(strings.Replace(unpack[0].(string), "\x00", "", -1), 10, 64)
+					if err != nil {
+						log.Println(err)
+						continue
 					}
 
-					select {
-					case c <- &Attendance{UserID: userID, AttendedAt: timestamp}:
-						log.Printf("UserID %v timestamp %v status %v punch %v\n", userID, timestamp, status, punch)
-					default:
-						// If channel buffer is full, log a warning and drop the attendance
-						log.Printf("WARNING: Channel buffer full, dropping attendance record for UserID %v", userID)
-					}
+					c <- &Attendance{UserID: strconv.FormatInt(userID, 10), AttendedAt: timestamp}
+					log.Printf("UserID %v timestampe %v \n", userID, timestamp)
 				}
 			}
 		}

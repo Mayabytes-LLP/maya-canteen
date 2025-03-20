@@ -12,7 +12,7 @@ export interface AppState {
     | "screenSaver";
   currentUser: User | null;
   setCurrentPage: (
-    page: "canteen" | "products" | "users" | "screenSaver" | "transactions",
+    page: "canteen" | "products" | "users" | "screenSaver" | "transactions"
   ) => void;
   setCurrentUser: (user: User | null) => void;
   setAdmin: (admin: boolean) => void;
@@ -60,8 +60,8 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
               break;
             case "attendance_event": {
               console.log("Attendance event:", message);
-              const { userId } = message.payload;
-              const user = await transactionService.getUser(userId);
+              const { user_id } = message.payload;
+              const user = await transactionService.getUser(user_id);
               if (!user) {
                 toast.error("User not found");
                 return;

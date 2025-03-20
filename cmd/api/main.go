@@ -60,7 +60,7 @@ func setupZKDevice(eventLogger *log.Logger) *gozk.ZK {
 			}
 
 			log.Println("ZK Device Connected")
-			c, err := zkSocket.LiveCapture()
+			c, err := zkSocket.LiveCapture(time.Duration(5) * time.Second)
 			if err != nil {
 				log.Printf("Failed to start live capture: %v. Retrying in 3 seconds...", err)
 				time.Sleep(3 * time.Second)
