@@ -53,11 +53,28 @@ jobs:
           cd frontend
           pnpm build
 
-      - name: Build Backend for ${{ matrix.os }}
+      - name: Build Backend for Windows
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
-          CGO_ENABLED=1 GOOS=${{ matrix.os == 'ubuntu-latest' && 'linux' || matrix.os == 'windows-latest' && 'windows' || 'darwin' }} GOARCH=amd64 go build -o ${{ matrix.output_name }} cmd/api/main.go
+          $env:CGO_ENABLED=1
+          $env:GOOS="windows"
+          $env:GOARCH="amd64"
+          go build -o ${{ matrix.output_name }} cmd/api/main.go
+
+      - name: Build Backend for Linux/macOS
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+            export GOOS=linux
+          else
+            export GOOS=darwin
+          fi
+          CGO_ENABLED=1 GOARCH=amd64 go build -o ${{ matrix.output_name }} cmd/api/main.go
 
       - name: Create distribution package
+        shell: bash
         run: |
           mkdir -p dist/db
           mkdir -p dist/frontend/dist
@@ -72,7 +89,6 @@ jobs:
           else
             cd dist && tar -czf ../${{ matrix.asset_name }}.tar.gz .
           fi
-        shell: bash
 
       - name: Upload release asset
         uses: actions/upload-release-asset@v1
