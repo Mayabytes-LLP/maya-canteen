@@ -59,13 +59,16 @@ func (zk *ZK) Connect() error {
 
 	tcpConnection := conn.(*net.TCPConn)
 	if err := tcpConnection.SetKeepAlive(true); err != nil {
+		log4go.Error("Failed to set keep-alive:", err)
 		return err
 	}
 
 	if err := tcpConnection.SetKeepAlivePeriod(KeepAlivePeriod); err != nil {
+		log4go.Error("Failed to set keep-alive period:", err)
 		return err
 	}
 
+	log4go.Info("Connected to ZK device at %s:%d", zk.host, zk.port)
 	zk.conn = tcpConnection
 
 	res, err := zk.sendCommand(CMD_CONNECT, nil, 8)
@@ -87,7 +90,7 @@ func (zk *ZK) Connect() error {
 	// 	}
 	// }
 	//
-	log.Println("Connected with session_id", zk.sessionID)
+	log4go.Info("Session ID: %d", zk.sessionID)
 	return nil
 }
 
@@ -364,15 +367,21 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 		return nil, err
 	}
 
-	log4go.Info("Start capturing")
+	// Use a larger buffer size to prevent blocking on channel sends
+	// This allows the system to queue up to 100 attendance events
+	// which should be sufficient for most scenarios
+	bufferSize := 100
+	log4go.Info("Start capturing with buffer size: %v", bufferSize)
+
 	zk.capturing = make(chan bool, 1)
-	c := make(chan *Attendance, 1)
+	c := make(chan *Attendance, bufferSize)
 
 	go func() {
 		defer func() {
 			log4go.Info("Stopped capturing")
 			zk.regEvent(0)
 			close(c)
+			zk.capturing = nil // Reset the capturing flag
 		}()
 
 		for {
@@ -381,6 +390,7 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 				return
 			default:
 				data, err := zk.receiveData(1032, KeepAlivePeriod)
+				log4go.Info("Zk Device Received data %v", len(data))
 				if err != nil {
 					if strings.Contains(err.Error(), "timeout") {
 						// Timeout is expected, send keep-alive
@@ -400,6 +410,7 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 					log4go.Error("Failed to send ACK:", err)
 					return
 				}
+				log4go.Info("Set Ack OK")
 
 				if len(data) == 0 {
 					log4go.Info("Empty data received, continuing")
@@ -515,8 +526,13 @@ func (zk *ZK) LiveCapture() (chan *Attendance, error) {
 						uid = userID
 					}
 
-					c <- &Attendance{UserID: userID, AttendedAt: timestamp}
-					log.Printf("UserID %v timestamp %v status %v punch %v\n", userID, timestamp, status, punch)
+					select {
+					case c <- &Attendance{UserID: userID, AttendedAt: timestamp}:
+						log.Printf("UserID %v timestamp %v status %v punch %v\n", userID, timestamp, status, punch)
+					default:
+						// If channel buffer is full, log a warning and drop the attendance
+						log.Printf("WARNING: Channel buffer full, dropping attendance record for UserID %v", userID)
+					}
 				}
 			}
 		}
