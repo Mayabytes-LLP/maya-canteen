@@ -1,7 +1,15 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { AppContext } from "@/components/canteen-provider";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Table,
   TableBody,
@@ -12,14 +20,23 @@ import {
 } from "@/components/ui/table";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { Product, transactionService } from "@/services/transaction-service";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 interface ProductListProps {
   refreshTrigger?: number;
+  onEditProduct: (product: Product) => void;
+  onDeleteProduct: (product: Product) => void;
 }
 
-export default function ProductList({ refreshTrigger = 0 }: ProductListProps) {
+export default function ProductList({
+  refreshTrigger = 0,
+  onEditProduct,
+  onDeleteProduct,
+}: ProductListProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { admin } = useContext(AppContext);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -63,6 +80,7 @@ export default function ProductList({ refreshTrigger = 0 }: ProductListProps) {
                   <TableHead>Type</TableHead>
                   <TableHead>Unit Price</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -78,6 +96,33 @@ export default function ProductList({ refreshTrigger = 0 }: ProductListProps) {
                       {formatPrice(product.single_unit_price)}
                     </TableCell>
                     <TableCell>{formatDate(product.created_at)}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={!admin}
+                            onClick={() => onEditProduct(product)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit Product
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={!admin}
+                            onClick={() => onDeleteProduct(product)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

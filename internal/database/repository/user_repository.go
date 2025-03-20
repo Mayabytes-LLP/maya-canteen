@@ -37,21 +37,21 @@ func (r *UserRepository) InitTable() error {
 
 	err1 := r.Create(&models.User{
 		Name:       "Abdul Rafay",
-		EmployeeId: "10058",
-		Department: "Development",
+		EmployeeId: "10081",
+		Department: "Development Dept",
 		Phone:      "+923452324442",
 	})
 	err2 := r.Create(&models.User{
 		Name:       "Qasim Imtiaz",
 		EmployeeId: "10037",
-		Department: "Development",
+		Department: "Development Dept",
 		Phone:      "+923452565003",
 	})
 
 	err3 := r.Create(&models.User{
 		Name:       "Syed Kazim Raza",
 		EmployeeId: "10024",
-		Department: "Operations",
+		Department: "Admin Dept",
 		Phone:      "+923422949447",
 	})
 

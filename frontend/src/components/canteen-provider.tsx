@@ -114,8 +114,6 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     ws,
   };
 
-  const admins = ["10058", "10037", "10024"];
-
   useEffect(() => {
     console.log("currentUser", currentUser);
     if (!currentUser?.id) {
@@ -126,7 +124,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     if (
       currentUser &&
       currentUser.id &&
-      admins.includes(currentUser.employee_id)
+      ["10081", "10037", "10024"].includes(currentUser.employee_id)
     ) {
       setCurrentPage("canteen");
       setAdmin(true);

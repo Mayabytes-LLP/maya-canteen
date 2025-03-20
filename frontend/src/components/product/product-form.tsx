@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { transactionService } from "@/services/transaction-service";
+import { Product, transactionService } from "@/services/transaction-service";
 import { Checkbox } from "../ui/checkbox";
 
 // Form validation schema
@@ -40,12 +40,16 @@ type FormValues = z.infer<typeof formSchema>;
 
 interface ProductFormProps {
   onProductAdded: () => void;
+  initialData?: Product;
 }
 
-export default function ProductForm({ onProductAdded }: ProductFormProps) {
+export default function ProductForm({
+  onProductAdded,
+  initialData,
+}: ProductFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const defaultValues: FormValues = {
+  const defaultValues: FormValues = initialData || {
     name: "",
     description: "",
     price: 5,
@@ -60,24 +64,30 @@ export default function ProductForm({ onProductAdded }: ProductFormProps) {
     defaultValues,
   });
 
+  useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
+    }
+  }, [initialData, form]);
+
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     try {
-      await transactionService.createProduct({
-        name: data.name,
-        description: data.description,
-        price: data.price,
-        type: data.type,
-        is_single_unit: data.is_single_unit,
-        single_unit_price: data.single_unit_price,
-      });
-
-      toast.success("Product added successfully");
+      if (initialData) {
+        await transactionService.updateProduct({
+          id: initialData.id,
+          ...data,
+        });
+        toast.success("Product updated successfully");
+      } else {
+        await transactionService.createProduct(data);
+        toast.success("Product added successfully");
+      }
       form.reset(defaultValues);
       onProductAdded();
     } catch (error) {
-      console.error("Error adding product:", error);
-      toast.error("Failed to add product");
+      console.error("Error saving product:", error);
+      toast.error("Failed to save product");
     } finally {
       setIsSubmitting(false);
     }
@@ -86,7 +96,9 @@ export default function ProductForm({ onProductAdded }: ProductFormProps) {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Add New Product</CardTitle>
+        <CardTitle>
+          {initialData ? "Edit Product" : "Add New Product"}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -202,7 +214,13 @@ export default function ProductForm({ onProductAdded }: ProductFormProps) {
             />
 
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Adding..." : "Add Product"}
+              {isSubmitting
+                ? initialData
+                  ? "Updating..."
+                  : "Adding..."
+                : initialData
+                ? "Update Product"
+                : "Add Product"}
             </Button>
           </form>
         </Form>
