@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import TransactionsPage from "./components/transactions-page";
 import {
   Form,
   FormControl,
@@ -21,8 +22,8 @@ import {
   FormMessage,
 } from "./components/ui/form";
 import { Input } from "./components/ui/input";
+import { cn } from "./lib/utils";
 import { transactionService } from "./services/transaction-service";
-import TransactionsPage from "./components/transactions-page";
 
 // Form validation schema
 const formSchema = z.object({
@@ -32,8 +33,14 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 function App() {
-  const { admin, currentPage, currentUser, setCurrentPage, setCurrentUser } =
-    useContext(AppContext);
+  const {
+    admin,
+    currentPage,
+    currentUser,
+    setCurrentPage,
+    setCurrentUser,
+    zkDeviceStatus,
+  } = useContext(AppContext);
   const [showLogin, setShowLogin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,8 +56,13 @@ function App() {
     setIsSubmitting(true);
     try {
       setShowLogin(true);
-      console.log(data);
-      // number need to be 5 digits
+      // hard code password and prompt user to enter passwrd to login
+      const password = prompt("Enter password to login");
+      if (password !== "6479") {
+        toast.error("Invalid password");
+        form.reset();
+        return;
+      }
       const user = await transactionService.getUser(data.employee_id);
       if (!user) {
         toast.error("User not found");
@@ -62,8 +74,8 @@ function App() {
       toast.success("User logged in successfully");
       form.reset();
     } catch (error) {
-      console.error("Error adding user:", error);
-      toast.error("Failed to add user");
+      console.error("Error getting User:", error);
+      toast.error("Failed to login");
     } finally {
       setIsSubmitting(false);
     }
@@ -74,6 +86,12 @@ function App() {
   };
   return (
     <div className="min-h-screen ">
+      <div
+        className={cn(
+          "fixed bottom-0 left-0 w-full h-1 z-50",
+          zkDeviceStatus ? "bg-green-500" : "bg-pink-700"
+        )}
+      ></div>
       {currentPage != "screenSaver" && (
         <nav className="shadow-sm">
           <div className="container mx-auto p-4">
@@ -142,9 +160,7 @@ function App() {
           <div className="flex h-screen w-full overflow items-center justify-center bg-background">
             <Card className="w-[350px]">
               <CardHeader>
-                <CardTitle className="text-center">
-                  Mayabytes Canteen Login
-                </CardTitle>
+                <CardTitle className="text-center">Admin Login</CardTitle>
               </CardHeader>
               <CardContent>
                 <Form {...form}>

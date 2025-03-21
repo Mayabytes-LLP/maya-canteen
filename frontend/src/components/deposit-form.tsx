@@ -35,7 +35,11 @@ import {
 
 import { cn } from "@/lib/utils";
 import { AppContext } from "./canteen-provider";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 import {
   Command,
@@ -45,7 +49,8 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Checkbox } from "./ui/checkbox";
+import { Checkbox } from "@/components/ui/checkbox";
+
 // Define cart item to represent a product and its quantity
 interface CartItem {
   productId: number;
@@ -84,6 +89,7 @@ export default function DepositForm({
   const [isSingleUnit, setIsSingleUnit] = useState<boolean>(false);
 
   const [userPopover, setUserPopover] = useState<boolean>(false);
+  const [productPopover, setProductPopover] = useState<boolean>(false);
 
   const { admin, currentUser } = useContext(AppContext);
 
@@ -400,28 +406,78 @@ export default function DepositForm({
                     control={form.control}
                     name="product_id"
                     render={({ field }) => (
-                      <FormItem className="flex-grow">
-                        <FormLabel>Product</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
+                      <FormItem className="flex flex-1 flex-col items-stretch">
+                        <FormLabel>Products</FormLabel>
+                        <Popover
+                          open={productPopover}
+                          onOpenChange={setProductPopover}
                         >
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select product" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem
-                                key={product.id}
-                                value={product.id.toString()}
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between",
+                                  !field.value && "text-muted-foreground",
+                                )}
                               >
-                                {product.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                                {field.value
+                                  ? (() => {
+                                      const cu = products.find(
+                                        (product) =>
+                                          product.id.toString() === field.value,
+                                      );
+
+                                      if (!cu) {
+                                        return ``;
+                                      }
+
+                                      return `${cu.name}`;
+                                    })()
+                                  : "Select Prodcut"}
+                                <ChevronsUpDown className="opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0">
+                            <Command>
+                              <CommandInput
+                                placeholder="Search Product..."
+                                className="h-9"
+                              />
+                              <CommandList>
+                                <CommandEmpty>No Products found.</CommandEmpty>
+                                <CommandGroup>
+                                  {products.map((product) => (
+                                    <CommandItem
+                                      key={product.id.toString()}
+                                      value={product.id.toString()}
+                                      onSelect={() => {
+                                        form.setValue(
+                                          "product_id",
+                                          product.id.toString(),
+                                        );
+                                        setProductPopover(false);
+                                      }}
+                                    >
+                                      {product.name}{" "}
+                                      <Check
+                                        className={cn(
+                                          "ml-auto",
+                                          product.id.toString() === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0",
+                                        )}
+                                      />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        <FormDescription>Select The Product</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}

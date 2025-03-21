@@ -48,7 +48,7 @@ type Service interface {
 	GetTransactionsByUserID(userID int64, limit int) ([]models.EmployeeTransaction, error)
 	GetTransactionsByDateRange(startDate, endDate time.Time) ([]models.Transaction, error)
 	GetUsersBalances() ([]models.UserBalance, error)
-
+	GetUserBalanceByUserID(userID int64) (models.UserBalance, error)
 	// Product-related operations
 	InitProductTable() error
 	CreateProduct(product *models.Product) error
@@ -251,6 +251,10 @@ func (s *service) GetTransactionsByDateRange(startDate, endDate time.Time) ([]mo
 
 func (s *service) GetUsersBalances() ([]models.UserBalance, error) {
 	return s.transactionRepository.GetUsersBalances()
+}
+
+func (s *service) GetUserBalanceByUserID(userID int64) (models.UserBalance, error) {
+	return s.transactionRepository.GetUserBalanceByID(userID)
 }
 
 // Product-related operations

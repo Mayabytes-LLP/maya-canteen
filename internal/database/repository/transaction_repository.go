@@ -151,16 +151,16 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 	log.Printf("GetByUserID called with userID: %d", userID)
 	log.Printf("Limit: %d", limit)
 	query := `
-	  SELECT 
-        users.name, 
-        users.employee_id, 
-        users.department, 
-        transactions.id, 
-        transactions.user_id, 
-        transactions.amount, 
-        transactions.description, 
-        transactions.transaction_type, 
-        transactions.created_at, 
+	  SELECT
+        users.name,
+        users.employee_id,
+        users.department,
+        transactions.id,
+        transactions.user_id,
+        transactions.amount,
+        transactions.description,
+        transactions.transaction_type,
+        transactions.created_at,
         transactions.updated_at
 	  FROM transactions
 	  LEFT JOIN users ON transactions.user_id = users.id
@@ -300,4 +300,21 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 	}
 	log.Printf("Fetched balances: %v", balances)
 	return balances, nil
+}
+
+func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBalance, error) {
+	query := `
+		SELECT users.id, users.name, users.employee_id, users.department, users.phone,
+		       COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
+		FROM users
+		LEFT JOIN transactions ON users.id = transactions.user_id
+		WHERE users.id = ?
+		GROUP BY users.id
+	`
+	var balance models.UserBalance
+	err := r.db.QueryRow(query, userID).Scan(&balance.UserID, &balance.UserName, &balance.EmployeeID, &balance.Department, &balance.Phone, &balance.Balance)
+	if err != nil {
+		return models.UserBalance{}, err
+	}
+	return balance, nil
 }

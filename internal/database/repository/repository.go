@@ -34,6 +34,7 @@ type TransactionRepositoryInterface interface {
 	GetByDateRange(startDate, endDate time.Time) ([]models.Transaction, error)
 	GetLatest(limit int) ([]models.Transaction, error)
 	GetUsersBalances() ([]models.UserBalance, error)
+	GetUserBalanceByID(userID int64) (models.UserBalance, error)
 }
 
 // ProductRepositoryInterface defines operations for product data

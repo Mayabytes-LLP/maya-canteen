@@ -4,18 +4,38 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
 
+import { cn } from "@/lib/utils";
+
+import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
+
+import { AppContext } from "@/components/canteen-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -24,12 +44,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2 } from "lucide-react";
 
 import { Product, transactionService } from "@/services/transaction-service";
-
-import { AppContext } from "./canteen-provider";
-import { Checkbox } from "./ui/checkbox";
 
 // Define cart item to represent a product and its quantity
 interface CartItem {
@@ -63,6 +79,8 @@ export default function TransactionForm({
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isSingleUnit, setIsSingleUnit] = useState<boolean>(false);
+
+  const [productPopover, setProductPopover] = useState(false);
 
   const { admin, currentUser, setCurrentUser } = useContext(AppContext);
 
@@ -99,7 +117,7 @@ export default function TransactionForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0,
+      0
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -119,7 +137,7 @@ export default function TransactionForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId,
+      (product) => product.id === productId
     );
 
     if (!selectedProduct) {
@@ -134,7 +152,7 @@ export default function TransactionForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit,
+      (item) => item.productId === productId && item.single === isSingleUnit
     );
 
     if (existingItemIndex >= 0) {
@@ -198,7 +216,7 @@ export default function TransactionForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`,
+              }`
           )
           .filter(Boolean)
           .join(", ");
@@ -307,33 +325,82 @@ export default function TransactionForm({
               />
             ) : (
               <>
-                <div className="flex space-x-4">
+                <div className="flex align-top space-x-4">
                   <FormField
                     control={form.control}
                     name="product_id"
                     render={({ field }) => (
-                      <FormItem className="flex-grow">
-                        <FormLabel>Product</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
+                      <FormItem className="w-1/3">
+                        <FormLabel>Products</FormLabel>
+                        <Popover
+                          open={productPopover}
+                          onOpenChange={setProductPopover}
                         >
-                          <FormControl>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select product" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {products.map((product) => (
-                              <SelectItem
-                                key={product.id}
-                                value={product.id.toString()}
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant="outline"
+                                role="combobox"
+                                className={cn(
+                                  "w-full justify-between",
+                                  !field.value && "text-muted-foreground"
+                                )}
                               >
-                                {product.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                                {field.value
+                                  ? (() => {
+                                      const cu = products.find(
+                                        (product) =>
+                                          product.id.toString() === field.value
+                                      );
+
+                                      if (!cu) {
+                                        return ``;
+                                      }
+
+                                      return `${cu.name}`;
+                                    })()
+                                  : "Select Product"}
+                                <ChevronsUpDown className="opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full p-0">
+                            <Command>
+                              <CommandInput
+                                placeholder="Search Product..."
+                                className="h-9"
+                              />
+                              <CommandList>
+                                <CommandEmpty>No Products found.</CommandEmpty>
+                                <CommandGroup>
+                                  {products.map((product) => (
+                                    <CommandItem
+                                      key={product.id.toString()}
+                                      value={product.id.toString()}
+                                      onSelect={() => {
+                                        form.setValue(
+                                          "product_id",
+                                          product.id.toString()
+                                        );
+                                        setProductPopover(false);
+                                      }}
+                                    >
+                                      {product.name}
+                                      <Check
+                                        className={cn(
+                                          "ml-auto",
+                                          product.id.toString() === field.value
+                                            ? "opacity-100"
+                                            : "opacity-0"
+                                        )}
+                                      />
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -364,34 +431,35 @@ export default function TransactionForm({
                         ) {
                           if (product.type === "cigarette") {
                             return (
-                              <div
+                              <FormItem
                                 key={product.id}
-                                className="flex h-14 items-center flex-col justify-end"
+                                className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow flex-1"
                               >
-                                <FormItem>
+                                <FormControl>
+                                  <Checkbox
+                                    className="h-6 w-6"
+                                    checked={isSingleUnit}
+                                    onCheckedChange={(val) => {
+                                      if (typeof val === "string") {
+                                        setIsSingleUnit(false);
+                                      } else {
+                                        setIsSingleUnit(val);
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none whitespace-nowrap">
                                   <FormLabel>Single Unit</FormLabel>
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={isSingleUnit}
-                                      onCheckedChange={(val) => {
-                                        if (typeof val === "string") {
-                                          setIsSingleUnit(false);
-                                        } else {
-                                          setIsSingleUnit(val);
-                                        }
-                                      }}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                                <p className="font-semibold">
-                                  <span className="text-xs text-muted-foreground">
-                                    Price: PKR.{" "}
-                                  </span>
-                                  {isSingleUnit
-                                    ? product.single_unit_price
-                                    : product.price}
-                                </p>
-                              </div>
+                                  <FormDescription>
+                                    <span className="text-xs text-muted-foreground">
+                                      Price: PKR.
+                                    </span>
+                                    {isSingleUnit
+                                      ? product.single_unit_price
+                                      : product.price}
+                                  </FormDescription>
+                                </div>
+                              </FormItem>
                             );
                           }
                           return (
@@ -405,15 +473,30 @@ export default function TransactionForm({
                             </div>
                           );
                         }
-                      })}{" "}
-                      <div className="pt-6">
+                      })}
+                      <div className="ml-auto flex flex-col pt-6">
                         <Button
                           type="button"
                           onClick={handleAddToCart}
                           size="lg"
                           variant="secondary"
                         >
-                          Add
+                          Add Rs.
+                          {parseInt(form.watch("quantity") || "1") *
+                            (isSingleUnit &&
+                            products.length > 0 &&
+                            form.watch("product_id")
+                              ? products.find(
+                                  (product) =>
+                                    product.id.toString() ===
+                                    form.watch("product_id")
+                                )?.single_unit_price ?? 0
+                              : products.find(
+                                  (product) =>
+                                    product.id.toString() ===
+                                    form.watch("product_id")
+                                )?.price ?? 0)}{" "}
+                          to Cart
                         </Button>
                       </div>
                     </>

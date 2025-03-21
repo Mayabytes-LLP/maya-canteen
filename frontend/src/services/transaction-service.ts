@@ -352,6 +352,21 @@ export const transactionService = {
     }
   },
 
+  async getBalanceByUserId(userId: number): Promise<UserBalance> {
+    try {
+      const response = await fetch(`${API_BASE}/users/${userId}/balance`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to fetch user's balance: ${errorText}`);
+      }
+      const res = await response.json();
+      return res.data;
+    } catch (error) {
+      console.error("Error fetching user's balance:", error);
+      throw error;
+    }
+  },
+
   async uploadUsersCsv(file: File): Promise<UserCSVResponse> {
     const formData = new FormData();
     formData.append("file", file);

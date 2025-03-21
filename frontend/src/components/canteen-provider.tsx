@@ -11,6 +11,7 @@ export interface AppState {
     | "users"
     | "screenSaver";
   currentUser: User | null;
+  zkDeviceStatus: boolean;
   setCurrentPage: (
     page: "canteen" | "products" | "users" | "screenSaver" | "transactions"
   ) => void;
@@ -23,6 +24,7 @@ export const initialState: AppState = {
   admin: false,
   currentPage: "canteen",
   currentUser: null,
+  zkDeviceStatus: false,
   setCurrentPage: () => null,
   setCurrentUser: () => null,
   setAdmin: () => null,
@@ -38,6 +40,9 @@ type Props = {
 export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
   const [currentPage, setCurrentPage] = useState(initialState.currentPage);
+  const [zkDeviceStatus, setZkDeviceStatus] = useState<boolean>(
+    initialState.zkDeviceStatus
+  );
   const [currentUser, setCurrentUser] = useState(initialState.currentUser);
   const ws = useRef<WebSocket | null>(null);
 
@@ -58,6 +63,15 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
             case "ping":
               ws.current?.send(JSON.stringify({ type: "pong" }));
               break;
+            case "device_status": {
+              const { status } = message.payload;
+              if (status !== "connected") {
+                setZkDeviceStatus(false);
+                break;
+              }
+              setZkDeviceStatus(true);
+              break;
+            }
             case "attendance_event": {
               console.log("Attendance event:", message);
               const { user_id } = message.payload;
@@ -111,6 +125,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     currentUser,
     setCurrentUser,
     setAdmin,
+    zkDeviceStatus,
     ws,
   };
 

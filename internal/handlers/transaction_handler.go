@@ -244,3 +244,21 @@ func (h *TransactionHandler) GetUsersBalances(w http.ResponseWriter, r *http.Req
 	log.Printf("Fetched user balances: %v", balances)
 	common.RespondWithSuccess(w, http.StatusOK, balances)
 }
+
+// GetUserBalanceByUserID handles GET /api/users/{user_id}/balance
+func (h *TransactionHandler) GetUserBalanceByUserID(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID, err := h.ParseID(vars, "user_id")
+	if err != nil {
+		h.HandleError(w, err)
+		return
+	}
+
+	balance, err := h.DB.GetUserBalanceByUserID(userID)
+	if err != nil {
+		h.HandleError(w, errors.Internal(err))
+		return
+	}
+
+	common.RespondWithSuccess(w, http.StatusOK, balance)
+}

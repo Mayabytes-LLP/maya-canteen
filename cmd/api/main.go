@@ -59,14 +59,26 @@ func setupZKDevice(eventLogger *log.Logger) *gozk.ZK {
 				continue
 			}
 
-			log.Println("ZK Device Connected")
 			c, err := zkSocket.LiveCapture(time.Duration(5) * time.Second)
 			if err != nil {
 				log.Printf("Failed to start live capture: %v. Retrying in 3 seconds...", err)
 				time.Sleep(3 * time.Second)
 				continue
 			}
+			log.Println("ZK Device Connected")
+			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+				"status": "connected",
+			})
 
+			// Send device status every 3 seconds
+			go func() {
+				for {
+					time.Sleep(3 * time.Second)
+					routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+						"status": "connected",
+					})
+				}
+			}()
 			// Handle events
 			for event := range c {
 				log.Printf("Event: %v", event)
@@ -82,6 +94,9 @@ func setupZKDevice(eventLogger *log.Logger) *gozk.ZK {
 			}
 
 			log.Println("Connection lost, attempting to reconnect...")
+			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+				"status": "disconnected",
+			})
 			time.Sleep(3 * time.Second)
 		}
 	}()

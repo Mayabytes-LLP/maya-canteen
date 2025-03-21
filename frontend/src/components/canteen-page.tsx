@@ -1,8 +1,15 @@
-import { useState } from "react";
+import { useContext, useEffect, useState } from "react";
 
+import { AppContext } from "@/components/canteen-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import {
+  transactionService,
+  type UserBalance,
+} from "@/services/transaction-service";
+import { toast } from "sonner";
 import TransactionForm from "./transaction-form";
 import TransactionList from "./transaction-list";
 
@@ -10,6 +17,34 @@ export default function CanteenPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [transactionLimit, setTransactionLimit] = useState(10);
   const [inputLimit, setInputLimit] = useState("10");
+  const [balance, setBalance] = useState<UserBalance | null>(null);
+
+  const { currentUser } = useContext(AppContext);
+
+  useEffect(() => {
+    if (currentUser?.id && balance === null) {
+      async function fetchUserBalance() {
+        const balance = currentUser
+          ? await transactionService.getBalanceByUserId(currentUser.id)
+          : null;
+        return balance;
+      }
+      fetchUserBalance()
+        .then((balance) => {
+          if (balance !== null) {
+            setBalance(balance);
+            toast("Your canteen balance is " + balance.balance);
+          } else {
+            setBalance(null);
+            toast.error("Failed to fetch user balance");
+            console.error("Failed to fetch user balance");
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+        });
+    }
+  }, [currentUser, balance]);
 
   // Function to trigger a refresh of the transaction list
   const handleTransactionAdded = () => {
@@ -33,9 +68,16 @@ export default function CanteenPage() {
 
   return (
     <div className="container mx-auto py-8">
-      <h1 className="text-3xl font-bold mb-8 text-center">
-        Maya Canteen System
-      </h1>
+      {balance && (
+        <div className="mb-4 text-lg text-center bg-accent p-4 rounded-lg">
+          <p>
+            Your canteen balance is:{" "}
+            <span className={cn(balance.balance < 0 && "text-red-500")}>
+              {balance.balance}
+            </span>
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-8">
         <div>
