@@ -53,10 +53,17 @@ func setupZKDevice(eventLogger *log.Logger) *gozk.ZK {
 	// Start a goroutine to handle connection and event capturing
 	go func() {
 		for {
-			if err := zkSocket.Connect(); err != nil {
-				log.Printf("Failed to connect to ZK device: %v. Retrying in 3 seconds...", err)
+			if zkSocket.IsConnected() {
+				log.Println("ZK Device already connected")
 				time.Sleep(3 * time.Second)
 				continue
+			} else {
+				log.Println("Connecting to ZK Device...")
+				if err := zkSocket.Connect(); err != nil {
+					log.Printf("Failed to connect to ZK device: %v. Retrying in 3 seconds...", err)
+					time.Sleep(3 * time.Second)
+					continue
+				}
 			}
 
 			c, err := zkSocket.LiveCapture(time.Duration(5) * time.Second)
@@ -65,6 +72,7 @@ func setupZKDevice(eventLogger *log.Logger) *gozk.ZK {
 				time.Sleep(3 * time.Second)
 				continue
 			}
+
 			log.Println("ZK Device Connected")
 			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
 				"status": "connected",
@@ -74,9 +82,15 @@ func setupZKDevice(eventLogger *log.Logger) *gozk.ZK {
 			go func() {
 				for {
 					time.Sleep(3 * time.Second)
-					routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
-						"status": "connected",
-					})
+					if zkSocket.IsConnected() {
+						routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+							"status": "connected",
+						})
+					} else {
+						routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+							"status": "disconnected",
+						})
+					}
 				}
 			}()
 			// Handle events
@@ -97,7 +111,8 @@ func setupZKDevice(eventLogger *log.Logger) *gozk.ZK {
 			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
 				"status": "disconnected",
 			})
-			time.Sleep(3 * time.Second)
+
+			zkSocket.Reconnect()
 		}
 	}()
 

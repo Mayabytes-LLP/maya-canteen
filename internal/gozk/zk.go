@@ -301,9 +301,6 @@ func (zk *ZK) GetAttendances() ([]*Attendance, error) {
 
 		// userID, err := strconv.ParseInt(strings.Replace(v[1].(string), "\x00", "", -1), 10, 64)
 		userID := strings.Replace(v[1].(string), "\x00", "", -1)
-		if err != nil {
-			return nil, err
-		}
 
 		attendances = append(attendances, &Attendance{AttendedAt: timestamp, UserID: userID})
 		data = data[40:]
