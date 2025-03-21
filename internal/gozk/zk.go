@@ -409,9 +409,25 @@ func (zk *ZK) LiveCapture(newTimeout time.Duration) (chan *Attendance, error) {
 					log4go.Info("Empty data received, continuing")
 					continue
 				}
-				// size := mustUnpack([]string{"H", "H", "I"}, data[:8])[2].(int)
+				log4go.Info("Received event data with length: %v", len(data))
+
+				// 		if self.tcp:
+				// 		size = unpack('<HHI', data_recv[:8])[2]
+				// 		header = unpack('HHHH', data_recv[8:16])
+				// 		data = data_recv[16:]
+				// else:
+				// 		size = len(data_recv)
+				// 		header = unpack('<4H', data_recv[:8])
+				// 		data = data_recv[8:]
+
+				size := mustUnpack([]string{"H", "H", "I"}, data[:8])[2].(int)
 				header := mustUnpack([]string{"H", "H", "H", "H"}, data[8:16])
 				data = data[16:]
+
+				if size != len(data) {
+					log4go.Error("Data size mismatch: %v != %v", size, len(data))
+					return
+				}
 
 				if header[0].(int) != CMD_REG_EVENT {
 					log4go.Info("Not an event, skipping")
@@ -433,6 +449,9 @@ func (zk *ZK) LiveCapture(newTimeout time.Duration) (chan *Attendance, error) {
 					} else if len(data) >= 52 {
 						unpack = mustUnpack([]string{"24s", "B", "B", "6s", "20s"}, data[:52])
 						data = data[52:]
+					} else {
+						log4go.Error("Unexpected data length: %v", len(data))
+						return
 					}
 
 					timestamp := zk.decodeTimeHex([]byte(unpack[3].(string)))

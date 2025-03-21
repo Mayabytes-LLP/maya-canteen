@@ -19,6 +19,7 @@ import {
   transactionService,
 } from "@/services/transaction-service";
 import { Info } from "lucide-react";
+import { ScrollArea } from "../ui/scroll-area";
 
 interface UserTransactionsProps {
   userId: string;
@@ -124,51 +125,53 @@ export default function UserTransactions({
               </div>
             </div>
 
-            <div className="space-y-4">
-              {transactions.map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between border-b pb-2"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <p className="font-medium">
-                        {transaction.transaction_type === "deposit"
-                          ? "Deposit"
-                          : "Purchase"}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 w-6 p-0"
-                        onClick={() => setSelectedTransaction(transaction)}
-                      >
-                        <Info className="h-3 w-3" />
-                        <span className="sr-only">Details</span>
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {transaction.description}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(transaction.created_at), "PPp")}
-                    </p>
-                  </div>
+            <ScrollArea className="h-96">
+              <div className="space-y-4">
+                {transactions.map((transaction) => (
                   <div
-                    className={`font-medium ${
-                      transaction.transaction_type === "deposit"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
+                    key={transaction.id}
+                    className="flex items-center justify-between border-b pb-2"
                   >
-                    {formatAmount(
-                      transaction.amount,
-                      transaction.transaction_type,
-                    )}
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <p className="font-medium">
+                          {transaction.transaction_type === "deposit"
+                            ? "Deposit"
+                            : "Purchase"}
+                        </p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => setSelectedTransaction(transaction)}
+                        >
+                          <Info className="h-3 w-3" />
+                          <span className="sr-only">Details</span>
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {transaction.description}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(transaction.created_at), "PPp")}
+                      </p>
+                    </div>
+                    <div
+                      className={`font-medium ${
+                        transaction.transaction_type === "deposit"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {formatAmount(
+                        transaction.amount,
+                        transaction.transaction_type,
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
           </>
         )}
       </CardContent>

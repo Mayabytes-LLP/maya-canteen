@@ -166,8 +166,8 @@ export default function UserBalances({
                 employee_id: data.employee_id,
                 phone: data.phone,
               }
-            : user
-        )
+            : user,
+        ),
       );
 
       setBalances(
@@ -180,8 +180,8 @@ export default function UserBalances({
                 employee_id: data.employee_id,
                 user_phone: data.phone,
               }
-            : balance
-        )
+            : balance,
+        ),
       );
 
       toast.success("User updated successfully");
@@ -375,7 +375,7 @@ export default function UserBalances({
                             role="combobox"
                             className={cn(
                               "w-full justify-between",
-                              !field.value && "text-muted-foreground"
+                              !field.value && "text-muted-foreground",
                             )}
                           >
                             {field.value || "Select Department"}
@@ -407,7 +407,7 @@ export default function UserBalances({
                                       "ml-auto",
                                       department === field.value
                                         ? "opacity-100"
-                                        : "opacity-0"
+                                        : "opacity-0",
                                     )}
                                   />
                                 </CommandItem>
