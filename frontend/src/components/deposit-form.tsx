@@ -33,14 +33,15 @@ import {
   User,
 } from "@/services/transaction-service";
 
-import { cn } from "@/lib/utils";
-import { AppContext } from "./canteen-provider";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { AppContext } from "./canteen-provider";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -49,7 +50,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Checkbox } from "@/components/ui/checkbox";
 
 // Define cart item to represent a product and its quantity
 interface CartItem {
@@ -131,7 +131,7 @@ export default function DepositForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0,
+      0
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -151,7 +151,7 @@ export default function DepositForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId,
+      (product) => product.id === productId
     );
 
     if (!selectedProduct) {
@@ -166,7 +166,7 @@ export default function DepositForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit,
+      (item) => item.productId === productId && item.single === isSingleUnit
     );
 
     if (existingItemIndex >= 0) {
@@ -230,7 +230,7 @@ export default function DepositForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`,
+              }`
           )
           .filter(Boolean)
           .join(", ");
@@ -318,13 +318,13 @@ export default function DepositForm({
                           role="combobox"
                           className={cn(
                             "w-full justify-between",
-                            !field.value && "text-muted-foreground",
+                            !field.value && "text-muted-foreground"
                           )}
                         >
                           {field.value
                             ? (() => {
                                 const cu = users.find(
-                                  (user) => user.id.toString() === field.value,
+                                  (user) => user.id.toString() === field.value
                                 );
 
                                 if (!cu) {
@@ -350,7 +350,7 @@ export default function DepositForm({
                             {users.map((user) => (
                               <CommandItem
                                 key={user.id.toString()}
-                                value={user.name.toString()}
+                                value={user.name}
                                 onSelect={() => {
                                   form.setValue("user_id", user.id.toString());
                                   setUserPopover(false);
@@ -363,7 +363,7 @@ export default function DepositForm({
                                     "ml-auto",
                                     user.id.toString() === field.value
                                       ? "opacity-100"
-                                      : "opacity-0",
+                                      : "opacity-0"
                                   )}
                                 />
                               </CommandItem>
@@ -401,12 +401,12 @@ export default function DepositForm({
               />
             ) : (
               <>
-                <div className="flex space-x-4">
+                <div className="flex align-top space-x-4">
                   <FormField
                     control={form.control}
                     name="product_id"
                     render={({ field }) => (
-                      <FormItem className="flex flex-1 flex-col items-stretch">
+                      <FormItem className="w-1/3">
                         <FormLabel>Products</FormLabel>
                         <Popover
                           open={productPopover}
@@ -419,14 +419,14 @@ export default function DepositForm({
                                 role="combobox"
                                 className={cn(
                                   "w-full justify-between",
-                                  !field.value && "text-muted-foreground",
+                                  !field.value && "text-muted-foreground"
                                 )}
                               >
                                 {field.value
                                   ? (() => {
                                       const cu = products.find(
                                         (product) =>
-                                          product.id.toString() === field.value,
+                                          product.id.toString() === field.value
                                       );
 
                                       if (!cu) {
@@ -435,7 +435,7 @@ export default function DepositForm({
 
                                       return `${cu.name}`;
                                     })()
-                                  : "Select Prodcut"}
+                                  : "Select Product"}
                                 <ChevronsUpDown className="opacity-50" />
                               </Button>
                             </FormControl>
@@ -452,22 +452,22 @@ export default function DepositForm({
                                   {products.map((product) => (
                                     <CommandItem
                                       key={product.id.toString()}
-                                      value={product.id.toString()}
+                                      value={product.name}
                                       onSelect={() => {
                                         form.setValue(
                                           "product_id",
-                                          product.id.toString(),
+                                          product.id.toString()
                                         );
                                         setProductPopover(false);
                                       }}
                                     >
-                                      {product.name}{" "}
+                                      {product.name}
                                       <Check
                                         className={cn(
                                           "ml-auto",
                                           product.id.toString() === field.value
                                             ? "opacity-100"
-                                            : "opacity-0",
+                                            : "opacity-0"
                                         )}
                                       />
                                     </CommandItem>
@@ -477,7 +477,6 @@ export default function DepositForm({
                             </Command>
                           </PopoverContent>
                         </Popover>
-                        <FormDescription>Select The Product</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -508,34 +507,35 @@ export default function DepositForm({
                         ) {
                           if (product.type === "cigarette") {
                             return (
-                              <div
+                              <FormItem
                                 key={product.id}
-                                className="flex h-14 items-center flex-col justify-end"
+                                className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow flex-1"
                               >
-                                <FormItem>
+                                <FormControl>
+                                  <Checkbox
+                                    className="h-6 w-6"
+                                    checked={isSingleUnit}
+                                    onCheckedChange={(val) => {
+                                      if (typeof val === "string") {
+                                        setIsSingleUnit(false);
+                                      } else {
+                                        setIsSingleUnit(val);
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none whitespace-nowrap">
                                   <FormLabel>Single Unit</FormLabel>
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={isSingleUnit}
-                                      onCheckedChange={(val) => {
-                                        if (typeof val === "string") {
-                                          setIsSingleUnit(false);
-                                        } else {
-                                          setIsSingleUnit(val);
-                                        }
-                                      }}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                                <p className="font-semibold">
-                                  <span className="text-xs text-muted-foreground">
-                                    Price: PKR.{" "}
-                                  </span>
-                                  {isSingleUnit
-                                    ? product.single_unit_price
-                                    : product.price}
-                                </p>
-                              </div>
+                                  <FormDescription>
+                                    <span className="text-xs text-muted-foreground">
+                                      Price: PKR.
+                                    </span>
+                                    {isSingleUnit
+                                      ? product.single_unit_price
+                                      : product.price}
+                                  </FormDescription>
+                                </div>
+                              </FormItem>
                             );
                           }
                           return (
@@ -549,14 +549,30 @@ export default function DepositForm({
                             </div>
                           );
                         }
-                      })}{" "}
-                      <div className="pt-6">
+                      })}
+                      <div className="ml-auto flex flex-col pt-6">
                         <Button
                           type="button"
                           onClick={handleAddToCart}
-                          variant="outline"
+                          size="lg"
+                          variant="secondary"
                         >
-                          Add
+                          Add Rs.
+                          {parseInt(form.watch("quantity") || "1") *
+                            (isSingleUnit &&
+                            products.length > 0 &&
+                            form.watch("product_id")
+                              ? products.find(
+                                  (product) =>
+                                    product.id.toString() ===
+                                    form.watch("product_id")
+                                )?.single_unit_price ?? 0
+                              : products.find(
+                                  (product) =>
+                                    product.id.toString() ===
+                                    form.watch("product_id")
+                                )?.price ?? 0)}{" "}
+                          to Cart
                         </Button>
                       </div>
                     </>
