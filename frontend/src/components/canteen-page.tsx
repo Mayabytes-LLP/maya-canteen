@@ -11,7 +11,7 @@ import {
 } from "@/services/transaction-service";
 import { toast } from "sonner";
 import TransactionForm from "./transaction-form";
-import TransactionList from "./transaction-user-list";
+import TransactionUserList from "./transaction-user-list";
 
 export default function CanteenPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -98,7 +98,7 @@ export default function CanteenPage() {
             </div>
             <Button onClick={applyLimit}>Apply</Button>
           </div>
-          <TransactionList
+          <TransactionUserList
             limit={transactionLimit}
             refreshTrigger={refreshTrigger}
           />
