@@ -11,11 +11,11 @@ import {
 } from "@/services/transaction-service";
 import { toast } from "sonner";
 import TransactionForm from "./transaction-form";
-import TransactionList from "./transaction-list";
+import TransactionList from "./transaction-user-list";
 
 export default function CanteenPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [transactionLimit, setTransactionLimit] = useState(10);
+  const [transactionLimit, setTransactionLimit] = useState(20);
   const [inputLimit, setInputLimit] = useState("10");
   const [balance, setBalance] = useState<UserBalance | null>(null);
 

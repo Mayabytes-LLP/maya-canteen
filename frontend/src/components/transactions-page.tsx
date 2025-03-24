@@ -9,7 +9,7 @@ import ErrorBoundary from "@/components/error-boundary";
 
 export default function TransactionsPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [transactionLimit, setTransactionLimit] = useState(10);
+  const [transactionLimit, setTransactionLimit] = useState(50);
   const [inputLimit, setInputLimit] = useState("10");
 
   // Function to trigger a refresh of the transaction list
@@ -37,7 +37,7 @@ export default function TransactionsPage() {
       <h1 className="text-3xl font-bold">Transactions Management</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="col-span-2">
+        <div>
           <DepositForm onTransactionAdded={handleTransactionAdded} />
         </div>
       </div>

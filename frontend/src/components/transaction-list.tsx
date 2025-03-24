@@ -210,7 +210,7 @@ export default function TransactionList({
         <CardTitle>
           {isFiltered
             ? "Filtered Transactions"
-            : `Latest ${limit} Transactions`}
+            : `Latest ${limit} Transactions of all users`}
         </CardTitle>
         <div className="flex flex-col space-y-2">
           <DateRangeFilter onTransactionsLoaded={handleFilteredTransactions} />

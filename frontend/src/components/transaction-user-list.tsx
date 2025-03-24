@@ -33,10 +33,12 @@ import { formatDate, formatPrice } from "@/lib/utils";
 import {
   Transaction,
   transactionService,
+  User,
 } from "@/services/transaction-service";
 import { Info, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import DateRangeFilter from "@/components/date-range-filter";
+
 interface TransactionListProps {
   limit?: number;
   refreshTrigger?: number;
@@ -47,6 +49,7 @@ export default function TransactionList({
   refreshTrigger = 0,
 }: TransactionListProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFiltered, setIsFiltered] = useState(false);
 
@@ -71,15 +74,18 @@ export default function TransactionList({
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!currentUser?.employee_id) return;
       setLoading(true);
-      if (!currentUser) return;
       try {
-        const transactionsData =
-          await transactionService.getTransactionsByUserId(
-            currentUser?.id.toString(),
+        const [transactionsData, usersData] = await Promise.all([
+          transactionService.getTransactionsByUserId(
+            currentUser?.employee_id,
             limit,
-          );
+          ),
+          transactionService.getAllUsers(),
+        ]);
         setTransactions(transactionsData ?? []);
+        setUsers(usersData ?? []);
         setIsFiltered(false);
       } catch (error) {
         toast.error("Failed to load transactions");
@@ -90,7 +96,7 @@ export default function TransactionList({
     };
 
     fetchData();
-  }, [limit, refreshTrigger, currentUser]);
+  }, [limit, refreshTrigger]);
 
   // Handler for when date range filter loads transactions
   const handleFilteredTransactions = (filteredTransactions: Transaction[]) => {
@@ -101,12 +107,9 @@ export default function TransactionList({
   // Reset filter and load latest transactions
   const handleResetFilter = async () => {
     setLoading(true);
-    if (!currentUser) return;
     try {
-      const transactionsData = await transactionService.getTransactionsByUserId(
-        currentUser?.id.toString(),
-        limit,
-      );
+      const transactionsData =
+        await transactionService.getLatestTransactions(limit);
       setTransactions(transactionsData);
       setIsFiltered(false);
       toast.success("Showing latest transactions");
@@ -116,6 +119,12 @@ export default function TransactionList({
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper function to get user name by ID
+  const getUserName = (userId: number): string => {
+    const user = users.find((u) => u.id === userId);
+    return user ? user.name : "Unknown User";
   };
 
   // Format transaction amount with currency symbol
@@ -205,7 +214,7 @@ export default function TransactionList({
         <CardTitle>
           {isFiltered
             ? "Filtered Transactions"
-            : `Latest ${limit} Transactions`}
+            : `Latest ${limit} Transactions of ${currentUser?.name}`}
         </CardTitle>
         <div className="flex flex-col space-y-2">
           <DateRangeFilter onTransactionsLoaded={handleFilteredTransactions} />
@@ -236,7 +245,9 @@ export default function TransactionList({
                 className="flex items-center justify-between border-b pb-2"
               >
                 <div className="space-y-1">
-                  <p className="font-medium">{currentUser?.name || "User"}</p>
+                  <p className="font-medium">
+                    {getUserName(transaction.user_id)}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {transaction.description}
                   </p>
@@ -308,7 +319,7 @@ export default function TransactionList({
                   <p className="text-sm font-medium text-muted-foreground">
                     User
                   </p>
-                  <p>{currentUser?.name || "User"}</p>
+                  <p>{getUserName(selectedTransaction.user_id)}</p>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
@@ -382,9 +393,9 @@ export default function TransactionList({
             <div className="grid gap-4 py-4">
               <div className="flex items-center gap-4">
                 <Label htmlFor="user" className="w-[120px]">
-                  User {editTransaction.user_id}
+                  User
                 </Label>
-                <p>{editTransaction.user_name}</p>
+                <p>{getUserName(editTransaction.user_id)}</p>
               </div>
 
               <div className="flex items-center gap-4">

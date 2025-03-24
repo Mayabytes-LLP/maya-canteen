@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+// Using Vite's proxy instead of hardcoded URL
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
+
 export interface Transaction {
   id: number;
   user_id: number;
@@ -61,10 +64,8 @@ export const Departments = [
   "Digital Marketing Dept",
   "Admin Department",
   "Sales Department Code Coffee",
-  "Operations",
   "Human Resources",
   "IT Support",
-  "Development",
 ] as const;
 
 export const zodUserSchema = z.object({
@@ -83,7 +84,7 @@ export const zodUserSchema = z.object({
       {
         message:
           "Invalid phone number format. Expected: 03XXXXXXXXX, +92XXXXXXXXXX, +1XXXXXXXXXX or 0311-XXXXXXX",
-      }
+      },
     )
     .transform((val) => {
       // Remove spaces and dashes
@@ -103,9 +104,6 @@ export const zodUserSchema = z.object({
     }),
 });
 
-// Using Vite's proxy instead of hardcoded URL
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api";
-
 export const transactionService = {
   async getAllTransactions(): Promise<Transaction[]> {
     const response = await fetch(`${API_BASE}/transactions`);
@@ -118,7 +116,7 @@ export const transactionService = {
 
   async getLatestTransactions(limit: number = 10): Promise<Transaction[]> {
     const response = await fetch(
-      `${API_BASE}/transactions/latest?limit=${limit}`
+      `${API_BASE}/transactions/latest?limit=${limit}`,
     );
     if (!response.ok) {
       throw new Error("Failed to fetch latest transactions");
@@ -142,9 +140,8 @@ export const transactionService = {
     transaction: Omit<
       Transaction,
       "id" | "user_name" | "created_at" | "updated_at"
-    >
+    >,
   ): Promise<Transaction> {
-    console.log(transaction);
     const response = await fetch(`${API_BASE}/transactions`, {
       method: "POST",
       headers: {
@@ -160,7 +157,7 @@ export const transactionService = {
   },
 
   async getTransactionsByDateRange(
-    dateRange: DateRangeRequest
+    dateRange: DateRangeRequest,
   ): Promise<Transaction[]> {
     const response = await fetch(`${API_BASE}/transactions/date-range`, {
       method: "POST",
@@ -196,7 +193,7 @@ export const transactionService = {
   },
 
   async createProduct(
-    product: Omit<Product, "id" | "created_at" | "updated_at">
+    product: Omit<Product, "id" | "created_at" | "updated_at">,
   ): Promise<Product> {
     const response = await fetch(`${API_BASE}/products`, {
       method: "POST",
@@ -214,7 +211,7 @@ export const transactionService = {
   },
 
   async updateProduct(
-    product: Omit<Product, "created_at" | "updated_at">
+    product: Omit<Product, "created_at" | "updated_at">,
   ): Promise<Product> {
     console.log(product);
     const response = await fetch(`${API_BASE}/products/${product.id}`, {
@@ -241,7 +238,7 @@ export const transactionService = {
   },
 
   async createUser(
-    user: Omit<User, "id" | "created_at" | "updated_at">
+    user: Omit<User, "id" | "created_at" | "updated_at">,
   ): Promise<User> {
     const response = await fetch(`${API_BASE}/users`, {
       method: "POST",
@@ -269,7 +266,7 @@ export const transactionService = {
   },
 
   async updateUser(
-    user: Pick<User, "id" | "name" | "employee_id" | "department" | "phone">
+    user: Pick<User, "id" | "name" | "employee_id" | "department" | "phone">,
   ): Promise<User> {
     console.log(user);
     const response = await fetch(`${API_BASE}/users/${user.id}`, {
@@ -296,7 +293,7 @@ export const transactionService = {
   },
 
   async updateTransaction(
-    transaction: Omit<Transaction, "created_at" | "updated_at">
+    transaction: Omit<Transaction, "created_at" | "updated_at">,
   ): Promise<Transaction> {
     const response = await fetch(`${API_BASE}/transactions/${transaction.id}`, {
       method: "PUT",
@@ -324,10 +321,10 @@ export const transactionService = {
   // default limit 10
   async getTransactionsByUserId(
     userId: string,
-    limit = 10
+    limit = 10,
   ): Promise<Transaction[]> {
     const response = await fetch(
-      `${API_BASE}/users/${userId}/transactions?limit=${limit}`
+      `${API_BASE}/users/${userId}/transactions?limit=${limit}`,
     );
     if (!response.ok) {
       throw new Error("Failed to fetch user transactions");
