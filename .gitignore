@@ -34,3 +34,7 @@ main
 
 # remove the database directory
 db/
+
+*.db
+
+*.log
