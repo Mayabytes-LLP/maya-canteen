@@ -118,27 +118,77 @@ func setupLogFile(filename string) (*os.File, error) {
 	return file, nil
 }
 
+// minimal event handler that only processes connection-related events
 func eventHandler(evt interface{}) {
 	switch v := evt.(type) {
-	case *events.Message:
-		fmt.Println("Received a message!", v.Message.GetConversation())
+	case *events.Connected:
+		// Connected to WhatsApp
+		fmt.Println("Connected to WhatsApp")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "connected",
+			"message": "WhatsApp connected successfully",
+		})
+	case *events.LoggedOut:
+		// Logged out from WhatsApp
+		fmt.Println("Logged out from WhatsApp")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "WhatsApp logged out",
+		})
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+			"qr_code_base64": "",
+			"logged_in":      false,
+		})
+	case *events.StreamReplaced:
+		fmt.Println("Stream replaced")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "WhatsApp connected from another location",
+		})
+	default:
+		fmt.Printf("Unhandled event: %v\n", v)
 	}
 }
 
-func setupWhastapp() *whatsmeow.Client {
-	dbLog := waLog.Stdout("Database", "DEBUG", true)
-	container, err := sqlstore.New("sqlite3", "file:forWhatsapp.db?_foreign_keys=on", dbLog)
+func setupWhatsapp() *whatsmeow.Client {
+	dbLog := waLog.Stdout("Database", "INFO", true)
+	// Use a more reliable database path
+	dbPath, err := filepath.Abs("./whatsapp-store.db")
 	if err != nil {
+		log.Printf("Error getting absolute path: %v, using default", err)
+		dbPath = "file:whatsapp-store.db?_foreign_keys=on"
+	} else {
+		dbPath = fmt.Sprintf("file:%s?_foreign_keys=on", dbPath)
+	}
+
+	log.Printf("Using WhatsApp database at: %s", dbPath)
+	container, err := sqlstore.New("sqlite3", dbPath, dbLog)
+	if err != nil {
+		log.Printf("Failed to connect to WhatsApp database: %v", err)
 		panic(err)
 	}
+
 	// If you want multiple sessions, remember their JIDs and use .GetDevice(jid) or .GetAllDevices() instead.
 	deviceStore, err := container.GetFirstDevice()
 	if err != nil {
+		log.Printf("Failed to get WhatsApp device: %v", err)
 		panic(err)
 	}
-	clientLog := waLog.Stdout("Client", "DEBUG", true)
-	client := whatsmeow.NewClient(deviceStore, clientLog)
+
+	// Create client with specific options to disable history sync
+	client := whatsmeow.NewClient(deviceStore, nil)
+
+	// Only add event handler for essential events (connection status)
 	client.AddEventHandler(eventHandler)
+
+	// Register the WhatsApp client with the WebSocket handler for refresh capability
+	routes.GlobalWebSocketHandler.SetWhatsAppClient(client)
+
+	// Clear any previous QR code state first
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+		"qr_code_base64": "",
+		"logged_in":      false,
+	})
 
 	go func() {
 		if client.Store.ID == nil {
@@ -146,29 +196,75 @@ func setupWhastapp() *whatsmeow.Client {
 			qrChan, _ := client.GetQRChannel(context.Background())
 			err = client.Connect()
 			if err != nil {
+				log.Printf("Failed to connect to WhatsApp: %v", err)
 				panic(err)
 			}
+
+			log.Println("Waiting for QR code...")
 			for evt := range qrChan {
 				if evt.Event == "code" {
-					// Render the QR code here
-					// e.g. qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
-					// or just manually `echo 2@... | qrencode -t ansiutf8` in a terminal
+					// QR code received
+					log.Println("WhatsApp QR code received, broadcasting to UI")
 					routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
-						// send to frontend to display QR code
 						"qr_code_base64": evt.Code,
+						"logged_in":      false,
 					})
-
 					fmt.Println("QR code:", evt.Code)
 				} else {
 					fmt.Println("Login event:", evt.Event)
+					if evt.Event == "success" {
+						routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+							"status":  "connected",
+							"message": "WhatsApp login successful",
+						})
+						// Clear the QR code once logged in
+						routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+							"qr_code_base64": "",
+							"logged_in":      true,
+						})
+					}
 				}
 			}
 		} else {
 			// Already logged in, just connect
+			log.Println("WhatsApp already has credentials, attempting to connect...")
 			err = client.Connect()
 			if err != nil {
-				panic(err)
+				log.Printf("Failed to connect with existing credentials: %v, will clear session and retry", err)
+				// Clear session and retry
+				err = client.Logout()
+				if err != nil {
+					log.Printf("Failed to logout: %v", err)
+				}
+				// Restart the connection process
+				setupWhatsapp()
+				return
 			}
+
+			// Send a notification that WhatsApp is already connected
+			log.Println("WhatsApp already logged in and connected successfully")
+			routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+				"status":  "connected",
+				"message": "WhatsApp is already logged in",
+			})
+
+			// Clear any existing QR code since we're already logged in
+			routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+				"qr_code_base64": "",
+				"logged_in":      true,
+			})
+
+			// Verify connection
+			go func() {
+				time.Sleep(5 * time.Second) // Give some time for connection to stabilize
+				if client.IsConnected() {
+					log.Println("WhatsApp connection confirmed, client is connected")
+				} else {
+					log.Println("WhatsApp connection issue, client reports disconnected status")
+					// Try to reconnect
+					client.Connect()
+				}
+			}()
 		}
 	}()
 
@@ -220,7 +316,7 @@ func main() {
 	eventLogger := log.New(logFile, "", log.LstdFlags)
 	apiServer := server.NewServer()
 	zkSocket := setupZKDevice(eventLogger)
-	whatsapp := setupWhastapp()
+	whatsapp := setupWhatsapp()
 
 	done := make(chan bool, 1)
 	go gracefulShutdown(apiServer, zkSocket, whatsapp, done)

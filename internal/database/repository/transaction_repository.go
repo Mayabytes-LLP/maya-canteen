@@ -182,7 +182,7 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 			&transaction.UserName,
 			&transaction.EmployeeID,
 			&transaction.Department,
-			&transaction.TransactionID,
+			&transaction.ID,
 			&transaction.UserID,
 			&transaction.Amount,
 			&transaction.Description,

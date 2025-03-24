@@ -1,20 +1,30 @@
 import { useContext, useState } from "react";
 
 import DepositForm from "@/components/deposit-form";
+import ErrorBoundary from "@/components/error-boundary";
 import TransactionList from "@/components/transaction-list";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import ErrorBoundary from "@/components/error-boundary";
-import { AppContext } from "./canteen-provider";
+import { RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
+import { AppContext } from "./canteen-provider";
 
 export default function TransactionsPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [transactionLimit, setTransactionLimit] = useState(50);
   const [inputLimit, setInputLimit] = useState("10");
 
-  const { whatsappQR } = useContext(AppContext);
+  const { whatsappQR, whatsappStatus, ws } = useContext(AppContext);
 
   // Function to trigger a refresh of the transaction list
   const handleTransactionAdded = () => {
@@ -36,6 +46,13 @@ export default function TransactionsPage() {
     }
   };
 
+  // Function to manually refresh the WhatsApp connection
+  const refreshWhatsApp = () => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ type: "refresh_whatsapp" }));
+    }
+  };
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       <h1 className="text-3xl font-bold">Transactions Management</h1>
@@ -44,17 +61,73 @@ export default function TransactionsPage() {
         <div>
           <DepositForm onTransactionAdded={handleTransactionAdded} />
         </div>
+        <div>
+          <Card>
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <div>
+                  <CardTitle>WhatsApp Connection</CardTitle>
+                  <CardDescription>
+                    Scan the QR code to login with WhatsApp
+                  </CardDescription>
+                </div>
+                <Badge
+                  variant={whatsappStatus.connected ? "default" : "destructive"}
+                  className={`${
+                    whatsappStatus.connected ? "bg-green-600" : "bg-red-600"
+                  } text-white`}
+                >
+                  {whatsappStatus.connected ? "Connected" : "Disconnected"}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center">
+              {whatsappQR ? (
+                <div className="flex flex-col items-center">
+                  <QRCodeSVG
+                    value={whatsappQR}
+                    size={240}
+                    level="H"
+                    includeMargin={true}
+                    className="p-2 bg-white rounded-md border"
+                  />
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Scan with WhatsApp to login
+                  </p>
+                </div>
+              ) : whatsappStatus.connected ? (
+                <div className="text-center p-4">
+                  <p className="text-lg text-green-600 font-medium">
+                    WhatsApp is connected!
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {whatsappStatus.message}
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center p-4">
+                  <p className="text-lg">WhatsApp QR Code not available</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {whatsappStatus.message ||
+                      "WhatsApp authentication is pending."}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={refreshWhatsApp}
+                className="flex gap-2 items-center"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh WhatsApp Connection
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
       </div>
-      {whatsappQR ? (
-        <div>
-          <h3 className="text-xl font-bold">Whatsapp QR Code</h3>
-          <QRCodeSVG className="w-72" size={320} value={whatsappQR} />
-        </div>
-      ) : (
-        <div>
-          <p className="text-lg">Whatsapp QR Code not available</p>
-        </div>
-      )}
+
       <div className="space-y-4">
         <div className="flex items-end gap-2">
           <div className="space-y-2">

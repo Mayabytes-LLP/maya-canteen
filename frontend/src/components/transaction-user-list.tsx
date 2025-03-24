@@ -96,7 +96,7 @@ export default function TransactionList({
     };
 
     fetchData();
-  }, [limit, refreshTrigger]);
+  }, [limit, refreshTrigger, currentUser?.employee_id]);
 
   // Handler for when date range filter loads transactions
   const handleFilteredTransactions = (filteredTransactions: Transaction[]) => {
