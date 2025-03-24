@@ -13,11 +13,12 @@ export interface AppState {
   currentUser: User | null;
   zkDeviceStatus: boolean;
   setCurrentPage: (
-    page: "canteen" | "products" | "users" | "screenSaver" | "transactions"
+    page: "canteen" | "products" | "users" | "screenSaver" | "transactions",
   ) => void;
   setCurrentUser: (user: User | null) => void;
   setAdmin: (admin: boolean) => void;
   ws: React.RefObject<WebSocket | null>;
+  whatsappQR: string | null;
 }
 
 export const initialState: AppState = {
@@ -29,6 +30,7 @@ export const initialState: AppState = {
   setCurrentUser: () => null,
   setAdmin: () => null,
   ws: { current: null },
+  whatsappQR: null,
 };
 
 export const AppContext = createContext<AppState>(initialState);
@@ -41,9 +43,11 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
   const [currentPage, setCurrentPage] = useState(initialState.currentPage);
   const [zkDeviceStatus, setZkDeviceStatus] = useState<boolean>(
-    initialState.zkDeviceStatus
+    initialState.zkDeviceStatus,
   );
   const [currentUser, setCurrentUser] = useState(initialState.currentUser);
+  const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
+
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -82,6 +86,16 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
               }
               setCurrentUser(user);
               toast.success("User logged in successfully");
+              break;
+            }
+            case "whatsapp_qr": {
+              console.log("WhatsApp QR code:", message);
+              const { qr_code_base64 } = message.payload;
+              if (!qr_code_base64) {
+                setWhatsappQR(null);
+                break;
+              }
+              setWhatsappQR(qr_code_base64);
               break;
             }
           }
@@ -127,6 +141,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     setAdmin,
     zkDeviceStatus,
     ws,
+    whatsappQR,
   };
 
   useEffect(() => {

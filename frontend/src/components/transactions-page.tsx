@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 
 import DepositForm from "@/components/deposit-form";
 import TransactionList from "@/components/transaction-list";
@@ -6,11 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import ErrorBoundary from "@/components/error-boundary";
+import { AppContext } from "./canteen-provider";
+import { QRCodeSVG } from "qrcode.react";
 
 export default function TransactionsPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [transactionLimit, setTransactionLimit] = useState(50);
   const [inputLimit, setInputLimit] = useState("10");
+
+  const { whatsappQR } = useContext(AppContext);
 
   // Function to trigger a refresh of the transaction list
   const handleTransactionAdded = () => {
@@ -41,6 +45,16 @@ export default function TransactionsPage() {
           <DepositForm onTransactionAdded={handleTransactionAdded} />
         </div>
       </div>
+      {whatsappQR ? (
+        <div>
+          <h3 className="text-xl font-bold">Whatsapp QR Code</h3>
+          <QRCodeSVG className="w-72" size={320} value={whatsappQR} />
+        </div>
+      ) : (
+        <div>
+          <p className="text-lg">Whatsapp QR Code not available</p>
+        </div>
+      )}
       <div className="space-y-4">
         <div className="flex items-end gap-2">
           <div className="space-y-2">

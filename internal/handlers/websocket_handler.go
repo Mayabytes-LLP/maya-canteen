@@ -113,14 +113,11 @@ func (h *WebsocketHandler) Broadcast(msgType string, payload interface{}) {
 		Payload: payload,
 	}
 
-	log.Printf("Broadcasting message: %+v", message)
-	log.Printf("Number of connected clients: %d", len(h.clients))
-
 	deadClients := []*websocket.Conn{}
 
 	log.Printf("Broadcasting message: %v", message)
+	log.Printf("Number of connected clients: %d", len(h.clients))
 	// list all the clients and send the message to each of them
-	log.Printf("Number of clients: %v", len(h.clients))
 	for client := range h.clients {
 		if err := client.WriteJSON(message); err != nil {
 			log.Printf("WebSocket write error: %v", err)

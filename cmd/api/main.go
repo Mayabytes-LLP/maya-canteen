@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"maya-canteen/internal/gozk"
 	"maya-canteen/internal/server"
@@ -13,6 +14,11 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types/events"
+	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
 // Setup database path to be configurable, default to current directory
@@ -112,7 +118,64 @@ func setupLogFile(filename string) (*os.File, error) {
 	return file, nil
 }
 
-func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, done chan bool) {
+func eventHandler(evt interface{}) {
+	switch v := evt.(type) {
+	case *events.Message:
+		fmt.Println("Received a message!", v.Message.GetConversation())
+	}
+}
+
+func setupWhastapp() *whatsmeow.Client {
+	dbLog := waLog.Stdout("Database", "DEBUG", true)
+	container, err := sqlstore.New("sqlite3", "file:forWhatsapp.db?_foreign_keys=on", dbLog)
+	if err != nil {
+		panic(err)
+	}
+	// If you want multiple sessions, remember their JIDs and use .GetDevice(jid) or .GetAllDevices() instead.
+	deviceStore, err := container.GetFirstDevice()
+	if err != nil {
+		panic(err)
+	}
+	clientLog := waLog.Stdout("Client", "DEBUG", true)
+	client := whatsmeow.NewClient(deviceStore, clientLog)
+	client.AddEventHandler(eventHandler)
+
+	go func() {
+		if client.Store.ID == nil {
+			// No ID stored, new login
+			qrChan, _ := client.GetQRChannel(context.Background())
+			err = client.Connect()
+			if err != nil {
+				panic(err)
+			}
+			for evt := range qrChan {
+				if evt.Event == "code" {
+					// Render the QR code here
+					// e.g. qrterminal.GenerateHalfBlock(evt.Code, qrterminal.L, os.Stdout)
+					// or just manually `echo 2@... | qrencode -t ansiutf8` in a terminal
+					routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+						// send to frontend to display QR code
+						"qr_code_base64": evt.Code,
+					})
+
+					fmt.Println("QR code:", evt.Code)
+				} else {
+					fmt.Println("Login event:", evt.Event)
+				}
+			}
+		} else {
+			// Already logged in, just connect
+			err = client.Connect()
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
+
+	return client
+}
+
+func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whatsmeow.Client, done chan bool) {
 	// Create context that listens for the interrupt signal from the OS.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -127,6 +190,9 @@ func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, done chan bool)
 
 	zkSocket.Disconnect()
 	log.Println("ZK device disconnected")
+
+	whatsapp.Disconnect()
+	log.Println("Whatsapp disconnected")
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
@@ -154,9 +220,10 @@ func main() {
 	eventLogger := log.New(logFile, "", log.LstdFlags)
 	apiServer := server.NewServer()
 	zkSocket := setupZKDevice(eventLogger)
+	whatsapp := setupWhastapp()
 
 	done := make(chan bool, 1)
-	go gracefulShutdown(apiServer, zkSocket, done)
+	go gracefulShutdown(apiServer, zkSocket, whatsapp, done)
 
 	// Start the API server
 	log.Println("Starting API server")
