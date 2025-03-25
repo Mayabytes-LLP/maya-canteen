@@ -12,12 +12,17 @@ export interface AppState {
     | "screenSaver";
   currentUser: User | null;
   zkDeviceStatus: boolean;
+  whatsappStatus: {
+    connected: boolean;
+    message: string;
+  };
   setCurrentPage: (
-    page: "canteen" | "products" | "users" | "screenSaver" | "transactions"
+    page: "canteen" | "products" | "users" | "screenSaver" | "transactions",
   ) => void;
   setCurrentUser: (user: User | null) => void;
   setAdmin: (admin: boolean) => void;
   ws: React.RefObject<WebSocket | null>;
+  whatsappQR: string | null;
 }
 
 export const initialState: AppState = {
@@ -25,10 +30,15 @@ export const initialState: AppState = {
   currentPage: "canteen",
   currentUser: null,
   zkDeviceStatus: false,
+  whatsappStatus: {
+    connected: false,
+    message: "Disconnected",
+  },
   setCurrentPage: () => null,
   setCurrentUser: () => null,
   setAdmin: () => null,
   ws: { current: null },
+  whatsappQR: null,
 };
 
 export const AppContext = createContext<AppState>(initialState);
@@ -41,9 +51,14 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
   const [currentPage, setCurrentPage] = useState(initialState.currentPage);
   const [zkDeviceStatus, setZkDeviceStatus] = useState<boolean>(
-    initialState.zkDeviceStatus
+    initialState.zkDeviceStatus,
   );
   const [currentUser, setCurrentUser] = useState(initialState.currentUser);
+  const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState(
+    initialState.whatsappStatus,
+  );
+
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
@@ -84,6 +99,41 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
               toast.success("User logged in successfully");
               break;
             }
+            case "whatsapp_qr": {
+              console.log("WhatsApp QR code received:", message);
+              const { qr_code_base64, logged_in } = message.payload;
+
+              if (logged_in) {
+                // Already logged in, no need for QR code
+                setWhatsappQR(null);
+                toast.success("WhatsApp is already logged in");
+              } else if (!qr_code_base64 || qr_code_base64 === "") {
+                // No QR code or empty QR code
+                setWhatsappQR(null);
+              } else {
+                // Valid QR code received, set it for display
+                setWhatsappQR(qr_code_base64);
+                toast.info("WhatsApp QR code refreshed. Please scan to login.");
+              }
+              break;
+            }
+            case "whatsapp_status": {
+              console.log("WhatsApp status:", message);
+              const { status, message: statusMessage } = message.payload;
+              setWhatsappStatus({
+                connected: status === "connected",
+                message:
+                  statusMessage ||
+                  (status === "connected" ? "Connected" : "Disconnected"),
+              });
+
+              if (status === "connected") {
+                toast.success(statusMessage || "WhatsApp connected");
+              } else {
+                toast.error(statusMessage || "WhatsApp disconnected");
+              }
+              break;
+            }
           }
         } catch (error) {
           console.error("WebSocket message error:", error);
@@ -118,17 +168,6 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     };
   }, []);
 
-  const value = {
-    admin,
-    currentPage,
-    setCurrentPage,
-    currentUser,
-    setCurrentUser,
-    setAdmin,
-    zkDeviceStatus,
-    ws,
-  };
-
   useEffect(() => {
     console.log("currentUser", currentUser);
     if (!currentUser?.id) {
@@ -139,7 +178,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     if (
       currentUser &&
       currentUser.id &&
-      ["10081", "10037", "10024"].includes(currentUser.employee_id)
+      ["10081", "10037", "10024", "10091"].includes(currentUser.employee_id)
     ) {
       setCurrentPage("canteen");
       setAdmin(true);
@@ -149,7 +188,18 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     return;
   }, [admin, currentUser]);
 
-  useEffect(() => {}, [currentUser]);
+  const value = {
+    admin,
+    currentPage,
+    setCurrentPage,
+    currentUser,
+    setCurrentUser,
+    setAdmin,
+    zkDeviceStatus,
+    ws,
+    whatsappQR,
+    whatsappStatus,
+  };
 
   return (
     <AppContext.Provider {...props} value={value}>
