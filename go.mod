@@ -11,6 +11,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/stretchr/testify v1.10.0
 	go.mau.fi/whatsmeow v0.0.0-20250318233852-06705625cf82
+	google.golang.org/protobuf v1.36.5
 )
 
 require (
@@ -30,6 +31,5 @@ require (
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/net v0.37.0 // indirect
 	golang.org/x/sys v0.31.0 // indirect
-	google.golang.org/protobuf v1.36.5 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

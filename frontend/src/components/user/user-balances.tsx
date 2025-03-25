@@ -46,8 +46,10 @@ import {
   Check,
   ChevronsUpDown,
   CreditCard,
+  MessageCircle,
   MoreHorizontal,
   Pencil,
+  Send,
   Trash2,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -97,8 +99,10 @@ export default function UserBalances({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userPopover, setUserPopover] = useState(false);
+  const [sendingNotification, setSendingNotification] = useState(false);
+  const [sendingAllNotifications, setSendingAllNotifications] = useState(false);
 
-  const { admin } = useContext(AppContext);
+  const { admin, whatsappStatus } = useContext(AppContext);
 
   // Initialize form
   const form = useForm<FormValues>({
@@ -126,6 +130,49 @@ export default function UserBalances({
 
     fetchBalances();
   }, [refreshTrigger]);
+
+  // Function to send balance notification to a single user
+  const sendBalanceNotification = async (
+    userId: number,
+    employeeId: string
+  ) => {
+    setSendingNotification(true);
+    try {
+      const response = await transactionService.sendBalanceNotification(
+        employeeId
+      );
+      if (response.success) {
+        toast.success(
+          `Balance notification sent to user with ID ${employeeId}`
+        );
+      } else {
+        toast.error("Failed to send balance notification");
+      }
+    } catch (error) {
+      console.error("Error sending balance notification:", error);
+      toast.error("Failed to send balance notification");
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  // Function to send balance notifications to all users
+  const sendAllBalanceNotifications = async () => {
+    setSendingAllNotifications(true);
+    try {
+      const response = await transactionService.sendAllBalanceNotifications();
+      if (response.success) {
+        toast.success("Balance notifications sent to all users");
+      } else {
+        toast.error("Failed to send balance notifications to all users");
+      }
+    } catch (error) {
+      console.error("Error sending all balance notifications:", error);
+      toast.error("Failed to send balance notifications to all users");
+    } finally {
+      setSendingAllNotifications(false);
+    }
+  };
 
   const handleEdit = async (user: UserBalance) => {
     const currentUser = await transactionService.getUser(user.employee_id);
@@ -166,8 +213,8 @@ export default function UserBalances({
                 employee_id: data.employee_id,
                 phone: data.phone,
               }
-            : user,
-        ),
+            : user
+        )
       );
 
       setBalances(
@@ -180,8 +227,8 @@ export default function UserBalances({
                 employee_id: data.employee_id,
                 user_phone: data.phone,
               }
-            : balance,
-        ),
+            : balance
+        )
       );
 
       toast.success("User updated successfully");
@@ -228,8 +275,23 @@ export default function UserBalances({
 
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Users' Balances</CardTitle>
+        {admin && (
+          <Button
+            onClick={sendAllBalanceNotifications}
+            disabled={sendingAllNotifications || !whatsappStatus.connected}
+            className="flex items-center gap-2"
+          >
+            {sendingAllNotifications ? (
+              "Sending..."
+            ) : (
+              <>
+                <MessageCircle className="h-4 w-4" /> Send All Balances
+              </>
+            )}
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -249,7 +311,7 @@ export default function UserBalances({
                   <TableHead>Employee ID</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Balance (PKR)</TableHead>
-                  <TableHead className="w-[120px]">Actions</TableHead>
+                  <TableHead className="w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -285,7 +347,30 @@ export default function UserBalances({
                           <CreditCard className="h-4 w-4" />
                           <span className="sr-only">View Transactions</span>
                         </Button>
-
+                        {admin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              sendBalanceNotification(
+                                balance.user_id,
+                                balance.employee_id
+                              )
+                            }
+                            disabled={
+                              sendingNotification ||
+                              !whatsappStatus.connected ||
+                              !balance.user_phone
+                            }
+                            className="h-8 w-8 p-0"
+                            title="Send Balance Notification"
+                          >
+                            <Send className="h-4 w-4" />
+                            <span className="sr-only">
+                              Send Balance Notification
+                            </span>
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -375,7 +460,7 @@ export default function UserBalances({
                             role="combobox"
                             className={cn(
                               "w-full justify-between",
-                              !field.value && "text-muted-foreground",
+                              !field.value && "text-muted-foreground"
                             )}
                           >
                             {field.value || "Select Department"}
@@ -407,7 +492,7 @@ export default function UserBalances({
                                       "ml-auto",
                                       department === field.value
                                         ? "opacity-100"
-                                        : "opacity-0",
+                                        : "opacity-0"
                                     )}
                                   />
                                 </CommandItem>

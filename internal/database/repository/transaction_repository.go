@@ -38,8 +38,17 @@ func (r *TransactionRepository) InitTable() error {
 // Create inserts a new transaction into the database
 func (r *TransactionRepository) Create(transaction *models.Transaction) error {
 	query := `
-		INSERT INTO transactions (user_id, amount, description, transaction_type, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO transactions (
+      user_id, 
+      amount, 
+      description, 
+      transaction_type, 
+      created_at, 
+      updated_at
+    )
+		VALUES (
+      ?, ?, ?, ?, ?, ?
+    )
 	`
 	now := time.Now()
 	result, err := r.db.Exec(
@@ -95,7 +104,11 @@ func (r *TransactionRepository) GetAll() ([]models.Transaction, error) {
 
 // Get retrieves a single transaction by ID
 func (r *TransactionRepository) Get(id int64) (*models.Transaction, error) {
-	query := `SELECT * FROM transactions WHERE id = ?`
+	query := `
+    SELECT * 
+    FROM transactions 
+    WHERE id = ?
+  `
 	var transaction models.Transaction
 	err := r.db.QueryRow(query, id).Scan(
 		&transaction.ID,
@@ -267,19 +280,17 @@ func (r *TransactionRepository) GetLatest(limit int) ([]models.Transaction, erro
 // GetUsersBalances retrieves the total balance for each user
 func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error) {
 	query := `
-        SELECT users.id, users.name, users.employee_id, users.department, users.phone,
-               COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
+        SELECT 
+          users.id,
+          users.name, 
+          users.employee_id, 
+          users.department, 
+          users.phone,
+          COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
         FROM users
         LEFT JOIN transactions ON users.id = transactions.user_id
         GROUP BY users.id
     `
-	// 	`
-	// 	SELECT users.id, users.name, users.employee_id,
-	// 	       SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END) AS balance
-	// 	FROM users
-	// 	LEFT JOIN transactions ON users.id = transactions.user_id
-	// 	GROUP BY users.id
-	// `
 
 	rows, err := r.db.Query(query)
 	if err != nil {
@@ -291,28 +302,46 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 	var balances []models.UserBalance
 	for rows.Next() {
 		var balance models.UserBalance
-		err := rows.Scan(&balance.UserID, &balance.UserName, &balance.EmployeeID, &balance.Department, &balance.Phone, &balance.Balance)
+		err := rows.Scan(
+			&balance.UserID,
+			&balance.UserName,
+			&balance.EmployeeID,
+			&balance.Department,
+			&balance.Phone,
+			&balance.Balance,
+		)
 		if err != nil {
 			log.Printf("Error scanning row: %v", err)
 			return nil, err
 		}
 		balances = append(balances, balance)
 	}
-	log.Printf("Fetched balances: %v", balances)
 	return balances, nil
 }
 
 func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBalance, error) {
 	query := `
-		SELECT users.id, users.name, users.employee_id, users.department, users.phone,
-		       COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
+		SELECT 
+      users.id, 
+      users.name, 
+      users.employee_id, 
+      users.department, 
+      users.phone,
+		  COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
 		FROM users
 		LEFT JOIN transactions ON users.id = transactions.user_id
 		WHERE users.id = ?
 		GROUP BY users.id
 	`
 	var balance models.UserBalance
-	err := r.db.QueryRow(query, userID).Scan(&balance.UserID, &balance.UserName, &balance.EmployeeID, &balance.Department, &balance.Phone, &balance.Balance)
+	err := r.db.QueryRow(query, userID).Scan(
+		&balance.UserID,
+		&balance.UserName,
+		&balance.EmployeeID,
+		&balance.Department,
+		&balance.Phone,
+		&balance.Balance,
+	)
 	if err != nil {
 		return models.UserBalance{}, err
 	}

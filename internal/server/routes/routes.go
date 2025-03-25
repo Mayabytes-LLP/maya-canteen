@@ -25,6 +25,7 @@ func RegisterRoutes(db database.Service) http.Handler {
 	RegisterTransactionRoutes(router, db)
 	RegisterUserRoutes(router, db)
 	RegisterProductRoutes(router, db)
+	RegisterWhatsAppRoutes(router, db)
 
 	// Apply middleware to HTTP routes
 	httpHandlerWithMiddleware := middleware.Chain(router, middleware.CORS(), middleware.Logger(), middleware.Recover())

@@ -183,90 +183,36 @@ func setupWhatsapp() *whatsmeow.Client {
 
 	// Register the WhatsApp client with the WebSocket handler for refresh capability
 	routes.GlobalWebSocketHandler.SetWhatsAppClient(client)
+	routes.GlobalWebSocketHandler.RegisterQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
+		return client.GetQRChannel(ctx)
+	})
 
-	// Clear any previous QR code state first
+	// Initialize with disconnected status - we'll connect only on demand
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+		"status":  "disconnected",
+		"message": "WhatsApp initialized but not connected",
+	})
 	routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
 		"qr_code_base64": "",
 		"logged_in":      false,
 	})
 
-	go func() {
-		if client.Store.ID == nil {
-			// No ID stored, new login
-			qrChan, _ := client.GetQRChannel(context.Background())
-			err = client.Connect()
-			if err != nil {
-				log.Printf("Failed to connect to WhatsApp: %v", err)
-				panic(err)
-			}
-
-			log.Println("Waiting for QR code...")
-			for evt := range qrChan {
-				if evt.Event == "code" {
-					// QR code received
-					log.Println("WhatsApp QR code received, broadcasting to UI")
-					routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
-						"qr_code_base64": evt.Code,
-						"logged_in":      false,
-					})
-					fmt.Println("QR code:", evt.Code)
-				} else {
-					fmt.Println("Login event:", evt.Event)
-					if evt.Event == "success" {
-						routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
-							"status":  "connected",
-							"message": "WhatsApp login successful",
-						})
-						// Clear the QR code once logged in
-						routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
-							"qr_code_base64": "",
-							"logged_in":      true,
-						})
-					}
-				}
-			}
-		} else {
-			// Already logged in, just connect
-			log.Println("WhatsApp already has credentials, attempting to connect...")
-			err = client.Connect()
-			if err != nil {
-				log.Printf("Failed to connect with existing credentials: %v, will clear session and retry", err)
-				// Clear session and retry
-				err = client.Logout()
-				if err != nil {
-					log.Printf("Failed to logout: %v", err)
-				}
-				// Restart the connection process
-				setupWhatsapp()
-				return
-			}
-
-			// Send a notification that WhatsApp is already connected
-			log.Println("WhatsApp already logged in and connected successfully")
-			routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
-				"status":  "connected",
-				"message": "WhatsApp is already logged in",
-			})
-
-			// Clear any existing QR code since we're already logged in
-			routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
-				"qr_code_base64": "",
-				"logged_in":      true,
-			})
-
-			// Verify connection
-			go func() {
-				time.Sleep(5 * time.Second) // Give some time for connection to stabilize
-				if client.IsConnected() {
-					log.Println("WhatsApp connection confirmed, client is connected")
-				} else {
-					log.Println("WhatsApp connection issue, client reports disconnected status")
-					// Try to reconnect
-					client.Connect()
-				}
-			}()
-		}
-	}()
+	// Check if we already have credentials
+	if client.Store.ID != nil {
+		log.Println("WhatsApp credentials found, checking connection status...")
+		// Inform the frontend that credentials exist
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "WhatsApp credentials found, click refresh to connect",
+		})
+	} else {
+		// No credentials, inform the frontend
+		log.Println("No WhatsApp credentials found, will need to scan QR code")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "No WhatsApp credentials found, click refresh to get QR code",
+		})
+	}
 
 	return client
 }

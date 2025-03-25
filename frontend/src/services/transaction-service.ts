@@ -384,4 +384,69 @@ export const transactionService = {
     const res = await response.json();
     return res.data;
   },
+
+  // Add new functions for WhatsApp notification
+  async sendBalanceNotification(
+    employeeId: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const response = await fetch(
+        `${API_BASE}/whatsapp/notify/${employeeId}`,
+        {
+          method: "POST",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.error || "Failed to send notification",
+        };
+      }
+
+      return {
+        success: true,
+        message: result.message || "Notification sent successfully",
+      };
+    } catch (error) {
+      console.error("Error sending balance notification:", error);
+      return {
+        success: false,
+        message: "Error sending notification",
+      };
+    }
+  },
+
+  async sendAllBalanceNotifications(): Promise<{
+    success: boolean;
+    message?: string;
+  }> {
+    try {
+      const response = await fetch(`${API_BASE}/whatsapp/notify-all`, {
+        method: "POST",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: result.error || "Failed to send notifications",
+        };
+      }
+
+      return {
+        success: true,
+        message: result.message || "Notifications sent successfully",
+      };
+    } catch (error) {
+      console.error("Error sending all balance notifications:", error);
+      return {
+        success: false,
+        message: "Error sending notifications",
+      };
+    }
+  },
 };

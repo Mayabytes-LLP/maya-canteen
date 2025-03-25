@@ -23,5 +23,4 @@ func RegisterTransactionRoutes(router *mux.Router, db database.Service) {
 	router.HandleFunc("/api/users/{user_id}/transactions", transactionHandler.GetTransactionsByUserID).Methods("GET")
 	router.HandleFunc("/api/users/{user_id}/balance", transactionHandler.GetUserBalanceByUserID).Methods("GET")
 	router.HandleFunc("/api/users/balances", transactionHandler.GetUsersBalances).Methods("GET")
-	router.HandleFunc("/send-balance-notification", transactionHandler.SendBalanceNotification).Methods("POST")
 }
