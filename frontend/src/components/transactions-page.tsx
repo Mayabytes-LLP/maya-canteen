@@ -83,8 +83,8 @@ export default function TransactionsPage() {
                     {whatsappQR
                       ? "Scan the QR code to login with WhatsApp"
                       : whatsappStatus.connected
-                      ? "WhatsApp is connected and ready to send messages"
-                      : "Click refresh to connect WhatsApp"}
+                        ? "WhatsApp is connected and ready to send messages"
+                        : "Click refresh to connect WhatsApp"}
                   </CardDescription>
                 </div>
                 <Badge
@@ -102,9 +102,9 @@ export default function TransactionsPage() {
                 <div className="flex flex-col items-center">
                   <QRCodeSVG
                     value={whatsappQR}
-                    size={240}
-                    level="H"
-                    includeMargin={true}
+                    level="L"
+                    bgColor="#000"
+                    fgColor="#fff"
                     className="p-2 bg-white rounded-md border"
                   />
                   <p className="mt-2 text-sm text-muted-foreground">
