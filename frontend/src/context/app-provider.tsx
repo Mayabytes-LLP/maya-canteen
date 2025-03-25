@@ -11,12 +11,12 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
   const [currentPage, setCurrentPage] = useState(initialState.currentPage);
   const [zkDeviceStatus, setZkDeviceStatus] = useState<boolean>(
-    initialState.zkDeviceStatus
+    initialState.zkDeviceStatus,
   );
   const [currentUser, setCurrentUser] = useState(initialState.currentUser);
   const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState(
-    initialState.whatsappStatus
+    initialState.whatsappStatus,
   );
 
   const ws = useRef<WebSocket | null>(null);
@@ -137,7 +137,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     if (
       currentUser &&
       currentUser.id &&
-      ["10081", "10037", "10024", "10091"].includes(currentUser.employee_id)
+      ["10081", "1023", "10024", "10091"].includes(currentUser.employee_id)
     ) {
       setCurrentPage("canteen");
       setAdmin(true);

@@ -43,7 +43,7 @@ func (r *UserRepository) InitTable() error {
 	})
 	err2 := r.Create(&models.User{
 		Name:       "Qasim Imtiaz",
-		EmployeeId: "10037",
+		EmployeeId: "1023",
 		Department: "Development Dept",
 		Phone:      "+923452565003",
 	})
