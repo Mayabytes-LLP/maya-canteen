@@ -350,7 +350,7 @@ export default function DepositForm({
                             {users.map((user) => (
                               <CommandItem
                                 key={user.id.toString()}
-                                value={user.name.toString()}
+                                value={user.name}
                                 onSelect={() => {
                                   form.setValue("user_id", user.id.toString());
                                   setUserPopover(false);
@@ -401,12 +401,12 @@ export default function DepositForm({
               />
             ) : (
               <>
-                <div className="flex space-x-4">
+                <div className="flex align-top space-x-4">
                   <FormField
                     control={form.control}
                     name="product_id"
                     render={({ field }) => (
-                      <FormItem className="flex flex-1 flex-col items-stretch">
+                      <FormItem className="w-1/3">
                         <FormLabel>Products</FormLabel>
                         <Popover
                           open={productPopover}
@@ -435,7 +435,7 @@ export default function DepositForm({
 
                                       return `${cu.name}`;
                                     })()
-                                  : "Select Prodcut"}
+                                  : "Select Product"}
                                 <ChevronsUpDown className="opacity-50" />
                               </Button>
                             </FormControl>
@@ -452,7 +452,7 @@ export default function DepositForm({
                                   {products.map((product) => (
                                     <CommandItem
                                       key={product.id.toString()}
-                                      value={product.id.toString()}
+                                      value={product.name}
                                       onSelect={() => {
                                         form.setValue(
                                           "product_id",
@@ -461,7 +461,7 @@ export default function DepositForm({
                                         setProductPopover(false);
                                       }}
                                     >
-                                      {product.name}{" "}
+                                      {product.name}
                                       <Check
                                         className={cn(
                                           "ml-auto",
@@ -477,7 +477,6 @@ export default function DepositForm({
                             </Command>
                           </PopoverContent>
                         </Popover>
-                        <FormDescription>Select The Product</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -508,34 +507,35 @@ export default function DepositForm({
                         ) {
                           if (product.type === "cigarette") {
                             return (
-                              <div
+                              <FormItem
                                 key={product.id}
-                                className="flex h-14 items-center flex-col justify-end"
+                                className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 shadow flex-1"
                               >
-                                <FormItem>
+                                <FormControl>
+                                  <Checkbox
+                                    className="h-6 w-6"
+                                    checked={isSingleUnit}
+                                    onCheckedChange={(val) => {
+                                      if (typeof val === "string") {
+                                        setIsSingleUnit(false);
+                                      } else {
+                                        setIsSingleUnit(val);
+                                      }
+                                    }}
+                                  />
+                                </FormControl>
+                                <div className="space-y-1 leading-none whitespace-nowrap">
                                   <FormLabel>Single Unit</FormLabel>
-                                  <FormControl>
-                                    <Checkbox
-                                      checked={isSingleUnit}
-                                      onCheckedChange={(val) => {
-                                        if (typeof val === "string") {
-                                          setIsSingleUnit(false);
-                                        } else {
-                                          setIsSingleUnit(val);
-                                        }
-                                      }}
-                                    />
-                                  </FormControl>
-                                </FormItem>
-                                <p className="font-semibold">
-                                  <span className="text-xs text-muted-foreground">
-                                    Price: PKR.{" "}
-                                  </span>
-                                  {isSingleUnit
-                                    ? product.single_unit_price
-                                    : product.price}
-                                </p>
-                              </div>
+                                  <FormDescription>
+                                    <span className="text-xs text-muted-foreground">
+                                      Price: PKR.
+                                    </span>
+                                    {isSingleUnit
+                                      ? product.single_unit_price
+                                      : product.price}
+                                  </FormDescription>
+                                </div>
+                              </FormItem>
                             );
                           }
                           return (
@@ -549,14 +549,30 @@ export default function DepositForm({
                             </div>
                           );
                         }
-                      })}{" "}
-                      <div className="pt-6">
+                      })}
+                      <div className="ml-auto flex flex-col pt-6">
                         <Button
                           type="button"
                           onClick={handleAddToCart}
-                          variant="outline"
+                          size="lg"
+                          variant="secondary"
                         >
-                          Add
+                          Add Rs.
+                          {parseInt(form.watch("quantity") || "1") *
+                            (isSingleUnit &&
+                            products.length > 0 &&
+                            form.watch("product_id")
+                              ? products.find(
+                                  (product) =>
+                                    product.id.toString() ===
+                                    form.watch("product_id")
+                                )?.single_unit_price ?? 0
+                              : products.find(
+                                  (product) =>
+                                    product.id.toString() ===
+                                    form.watch("product_id")
+                                )?.price ?? 0)}{" "}
+                          to Cart
                         </Button>
                       </div>
                     </>

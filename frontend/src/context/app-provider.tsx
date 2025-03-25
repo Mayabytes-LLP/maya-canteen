@@ -127,7 +127,25 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
       }
     };
   }, []);
-
+  useEffect(() => {
+    console.log("currentUser", currentUser);
+    if (!currentUser?.id) {
+      setCurrentPage("screenSaver");
+      setAdmin(false);
+      return;
+    }
+    if (
+      currentUser &&
+      currentUser.id &&
+      ["10081", "10037", "10024", "10091"].includes(currentUser.employee_id)
+    ) {
+      setCurrentPage("canteen");
+      setAdmin(true);
+    } else {
+      setCurrentPage("canteen");
+    }
+    return;
+  }, [admin, currentUser]);
   const value = {
     admin,
     currentPage,
@@ -140,26 +158,6 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     whatsappQR,
     whatsappStatus,
   };
-
-  useEffect(() => {
-    console.log("currentUser", currentUser);
-    if (!currentUser?.id) {
-      setCurrentPage("screenSaver");
-      setAdmin(false);
-      return;
-    }
-    if (
-      currentUser &&
-      currentUser.id &&
-      ["10081", "10037", "10024"].includes(currentUser.employee_id)
-    ) {
-      setCurrentPage("canteen");
-      setAdmin(true);
-    } else {
-      setCurrentPage("canteen");
-    }
-    return;
-  }, [admin, currentUser]);
 
   return (
     <AppContext.Provider {...props} value={value}>
