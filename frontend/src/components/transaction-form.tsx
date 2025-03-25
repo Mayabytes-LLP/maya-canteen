@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 
-import { AppContext } from "@/components/canteen-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AppContext } from "@/context";
 
 import { Product, transactionService } from "@/services/transaction-service";
 
@@ -117,7 +117,7 @@ export default function TransactionForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0,
+      0
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -137,7 +137,7 @@ export default function TransactionForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId,
+      (product) => product.id === productId
     );
 
     if (!selectedProduct) {
@@ -152,7 +152,7 @@ export default function TransactionForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit,
+      (item) => item.productId === productId && item.single === isSingleUnit
     );
 
     if (existingItemIndex >= 0) {
@@ -216,7 +216,7 @@ export default function TransactionForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`,
+              }`
           )
           .filter(Boolean)
           .join(", ");
@@ -244,7 +244,7 @@ export default function TransactionForm({
       onTransactionAdded();
       setCurrentUser(null);
       toast.success(
-        `Transaction added successfully for User: ${currentUser.name}, Amount: ${finalAmount}`,
+        `Transaction added successfully for User: ${currentUser.name}, Amount: ${finalAmount}`
       );
     } catch (error) {
       toast.error("Failed to add transaction");
@@ -345,14 +345,14 @@ export default function TransactionForm({
                                 role="combobox"
                                 className={cn(
                                   "w-full justify-between",
-                                  !field.value && "text-muted-foreground",
+                                  !field.value && "text-muted-foreground"
                                 )}
                               >
                                 {field.value
                                   ? (() => {
                                       const cu = products.find(
                                         (product) =>
-                                          product.id.toString() === field.value,
+                                          product.id.toString() === field.value
                                       );
 
                                       if (!cu) {
@@ -382,7 +382,7 @@ export default function TransactionForm({
                                       onSelect={() => {
                                         form.setValue(
                                           "product_id",
-                                          product.id.toString(),
+                                          product.id.toString()
                                         );
                                         setProductPopover(false);
                                       }}
@@ -393,7 +393,7 @@ export default function TransactionForm({
                                           "ml-auto",
                                           product.id.toString() === field.value
                                             ? "opacity-100"
-                                            : "opacity-0",
+                                            : "opacity-0"
                                         )}
                                       />
                                     </CommandItem>
@@ -488,16 +488,16 @@ export default function TransactionForm({
                             (isSingleUnit &&
                             products.length > 0 &&
                             form.watch("product_id")
-                              ? (products.find(
+                              ? products.find(
                                   (product) =>
                                     product.id.toString() ===
-                                    form.watch("product_id"),
-                                )?.single_unit_price ?? 0)
-                              : (products.find(
+                                    form.watch("product_id")
+                                )?.single_unit_price ?? 0
+                              : products.find(
                                   (product) =>
                                     product.id.toString() ===
-                                    form.watch("product_id"),
-                                )?.price ?? 0))}{" "}
+                                    form.watch("product_id")
+                                )?.price ?? 0)}{" "}
                           to Cart
                         </Button>
                       </div>

@@ -1,7 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { AppContext } from "@/components/canteen-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -29,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AppContext } from "@/context";
 import { formatDate, formatPrice } from "@/lib/utils";
 import {
   Transaction,

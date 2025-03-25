@@ -33,14 +33,15 @@ import {
   User,
 } from "@/services/transaction-service";
 
-import { cn } from "@/lib/utils";
-import { AppContext } from "./canteen-provider";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { AppContext } from "@/context";
+import { cn } from "@/lib/utils";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Command,
   CommandEmpty,
@@ -49,7 +50,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Checkbox } from "@/components/ui/checkbox";
 
 // Define cart item to represent a product and its quantity
 interface CartItem {
@@ -131,7 +131,7 @@ export default function DepositForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0,
+      0
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -151,7 +151,7 @@ export default function DepositForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId,
+      (product) => product.id === productId
     );
 
     if (!selectedProduct) {
@@ -166,7 +166,7 @@ export default function DepositForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit,
+      (item) => item.productId === productId && item.single === isSingleUnit
     );
 
     if (existingItemIndex >= 0) {
@@ -230,7 +230,7 @@ export default function DepositForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`,
+              }`
           )
           .filter(Boolean)
           .join(", ");
@@ -318,13 +318,13 @@ export default function DepositForm({
                           role="combobox"
                           className={cn(
                             "w-full justify-between",
-                            !field.value && "text-muted-foreground",
+                            !field.value && "text-muted-foreground"
                           )}
                         >
                           {field.value
                             ? (() => {
                                 const cu = users.find(
-                                  (user) => user.id.toString() === field.value,
+                                  (user) => user.id.toString() === field.value
                                 );
 
                                 if (!cu) {
@@ -363,7 +363,7 @@ export default function DepositForm({
                                     "ml-auto",
                                     user.id.toString() === field.value
                                       ? "opacity-100"
-                                      : "opacity-0",
+                                      : "opacity-0"
                                   )}
                                 />
                               </CommandItem>
@@ -419,14 +419,14 @@ export default function DepositForm({
                                 role="combobox"
                                 className={cn(
                                   "w-full justify-between",
-                                  !field.value && "text-muted-foreground",
+                                  !field.value && "text-muted-foreground"
                                 )}
                               >
                                 {field.value
                                   ? (() => {
                                       const cu = products.find(
                                         (product) =>
-                                          product.id.toString() === field.value,
+                                          product.id.toString() === field.value
                                       );
 
                                       if (!cu) {
@@ -456,7 +456,7 @@ export default function DepositForm({
                                       onSelect={() => {
                                         form.setValue(
                                           "product_id",
-                                          product.id.toString(),
+                                          product.id.toString()
                                         );
                                         setProductPopover(false);
                                       }}
@@ -467,7 +467,7 @@ export default function DepositForm({
                                           "ml-auto",
                                           product.id.toString() === field.value
                                             ? "opacity-100"
-                                            : "opacity-0",
+                                            : "opacity-0"
                                         )}
                                       />
                                     </CommandItem>

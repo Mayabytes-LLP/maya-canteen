@@ -1,7 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { AppContext } from "@/components/canteen-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -18,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AppContext } from "@/context";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { Product, transactionService } from "@/services/transaction-service";
 import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";

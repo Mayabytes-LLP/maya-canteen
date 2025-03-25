@@ -1,7 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-import { AppContext } from "@/components/canteen-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -29,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AppContext } from "@/context";
 import { formatDate, formatPrice } from "@/lib/utils";
 import {
   Transaction,
@@ -59,10 +59,10 @@ export default function TransactionList({
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
   const [editTransaction, setEditTransaction] = useState<Transaction | null>(
-    null,
+    null
   );
   const [deleteTransactionId, setDeleteTransactionId] = useState<number | null>(
-    null,
+    null
   );
   const [editAmount, setEditAmount] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -104,8 +104,9 @@ export default function TransactionList({
   const handleResetFilter = async () => {
     setLoading(true);
     try {
-      const transactionsData =
-        await transactionService.getLatestTransactions(limit);
+      const transactionsData = await transactionService.getLatestTransactions(
+        limit
+      );
       setTransactions(transactionsData);
       setIsFiltered(false);
       toast.success("Showing latest transactions");
@@ -161,8 +162,8 @@ export default function TransactionList({
       // Update local state
       setTransactions(
         transactions.map((t) =>
-          t.id === editTransaction.id ? updatedTransaction : t,
-        ),
+          t.id === editTransaction.id ? updatedTransaction : t
+        )
       );
 
       toast.success("Transaction updated successfully");
@@ -261,7 +262,7 @@ export default function TransactionList({
                   >
                     {formatAmount(
                       transaction.amount,
-                      transaction.transaction_type,
+                      transaction.transaction_type
                     )}
                   </div>
                   {admin && (
@@ -330,7 +331,7 @@ export default function TransactionList({
                   >
                     {formatAmount(
                       selectedTransaction.amount,
-                      selectedTransaction.transaction_type,
+                      selectedTransaction.transaction_type
                     )}
                   </p>
                 </div>

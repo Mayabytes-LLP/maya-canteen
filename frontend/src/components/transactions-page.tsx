@@ -15,10 +15,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppContext } from "@/context";
 import { LoaderCircle, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "sonner";
-import { AppContext } from "./canteen-provider";
 
 export default function TransactionsPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
