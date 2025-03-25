@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AppProvider } from "@/context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { BrowserRouter as Router } from "react-router";
 import { Toaster } from "sonner";
 
 // Create a client
@@ -21,11 +22,13 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={queryClient}>
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <AppProvider>
-        <App />
-        <Toaster richColors />
-      </AppProvider>
-      {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+      <Router>
+        <AppProvider>
+          <App />
+        </AppProvider>
+        {/* <ReactQueryDevtools initialIsOpen={false} /> */}
+      </Router>
+      <Toaster richColors />
     </ThemeProvider>
   </QueryClientProvider>
 );

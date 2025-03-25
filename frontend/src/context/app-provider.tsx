@@ -1,5 +1,6 @@
 import { transactionService } from "@/services/transaction-service";
 import { useEffect, useRef, useState, type FC } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { AppContext, initialState } from "./app-context";
 
@@ -9,15 +10,16 @@ type Props = {
 
 export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
-  const [currentPage, setCurrentPage] = useState(initialState.currentPage);
   const [zkDeviceStatus, setZkDeviceStatus] = useState<boolean>(
-    initialState.zkDeviceStatus,
+    initialState.zkDeviceStatus
   );
   const [currentUser, setCurrentUser] = useState(initialState.currentUser);
   const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState(
-    initialState.whatsappStatus,
+    initialState.whatsappStatus
   );
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const ws = useRef<WebSocket | null>(null);
 
@@ -128,9 +130,10 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     };
   }, []);
   useEffect(() => {
-    console.log("currentUser", currentUser);
     if (!currentUser?.id) {
-      setCurrentPage("screenSaver");
+      if (location.pathname !== "/login") {
+        navigate("/login");
+      }
       setAdmin(false);
       return;
     }
@@ -139,17 +142,13 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
       currentUser.id &&
       ["10081", "1023", "10024", "10091"].includes(currentUser.employee_id)
     ) {
-      setCurrentPage("canteen");
       setAdmin(true);
-    } else {
-      setCurrentPage("canteen");
     }
     return;
-  }, [admin, currentUser]);
+  }, [admin, currentUser, location.pathname, navigate]);
+
   const value = {
     admin,
-    currentPage,
-    setCurrentPage,
     currentUser,
     setCurrentUser,
     setAdmin,

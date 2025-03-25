@@ -12,14 +12,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import {
   Departments,
@@ -42,26 +34,10 @@ import {
   PopoverTrigger,
 } from "@components/ui/popover";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  Check,
-  ChevronsUpDown,
-  CreditCard,
-  MessageCircle,
-  MoreHorizontal,
-  Pencil,
-  Send,
-  SendToBack,
-  Trash2,
-} from "lucide-react";
+import { Check, ChevronsUpDown, MessageCircle } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "../ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 import UserTransactions from "./user-transactions";
 
 import {
@@ -74,7 +50,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { AppContext } from "@/context";
-import { CopyButton } from "../ui/copy-button";
+import { BalanceTable } from "./user-data-table";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -184,6 +160,10 @@ export default function UserBalances({
     form.setValue("name", currentUser.name ?? "");
     form.setValue("employee_id", currentUser.employee_id ?? "");
     form.setValue("phone", currentUser.phone ?? "");
+    form.setValue(
+      "department",
+      currentUser.department as FormValues["department"]
+    );
     setOpenEditDialog(true);
   };
 
@@ -243,6 +223,7 @@ export default function UserBalances({
   const confirmDelete = (userId: number) => {
     setDeleteUserId(userId);
     setOpenDeleteDialog(true);
+    setBalances(balances.filter((balance) => balance.user_id !== userId));
   };
 
   const handleDelete = async () => {
@@ -269,19 +250,6 @@ export default function UserBalances({
   const showUserTransactions = (userId: string) => {
     setSelectedUserId(userId);
     setOpenTransactionsDialog(true);
-  };
-
-  const generateWhatsappUrl = (
-    phone: string,
-    name: string,
-    balance: number
-  ) => {
-    const message = `Balance Update\n\nDear ${name},\n\nYour current canteen balance is: PKR ${balance.toFixed(
-      2
-    )}\n\nThis is an automated message from Maya Canteen Management System.`;
-
-    const encodedMessage = encodeURIComponent(message);
-    return `https://wa.me/${phone}?text=${encodedMessage}`;
   };
 
   return (
@@ -315,122 +283,16 @@ export default function UserBalances({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>ID</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Balance (PKR)</TableHead>
-                  <TableHead className="w-[150px]">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {balances.map((balance) => (
-                  <TableRow key={balance.user_id}>
-                    <TableCell>{balance.employee_id}</TableCell>
-                    <TableCell className="font-medium">
-                      {`${balance.user_name} (${balance.user_department})`}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <span className="p-1 bg-zinc-700 w-28 text-center rounded">
-                          {balance.user_phone}
-                        </span>
-
-                        <CopyButton value={balance.user_phone} />
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {balance.balance && balance.balance.toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            showUserTransactions(balance.employee_id)
-                          }
-                          className="h-8 w-8 p-0"
-                          title="View Transactions"
-                        >
-                          <CreditCard className="h-4 w-4" />
-                          <span className="sr-only">View Transactions</span>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            window.open(
-                              generateWhatsappUrl(
-                                balance.user_phone,
-                                balance.user_name,
-                                balance.balance
-                              ),
-                              "_blank"
-                            )
-                          }
-                          disabled={sendingNotification || !balance.user_phone}
-                          className="h-8 w-8 p-0"
-                          title="Send Balance Notification"
-                        >
-                          <SendToBack className="h-4 w-4" />
-                          <span className="sr-only">
-                            Send Balance Notification
-                          </span>
-                        </Button>
-                        {admin && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              sendBalanceNotification(balance.employee_id)
-                            }
-                            disabled={
-                              sendingNotification ||
-                              !whatsappStatus.connected ||
-                              !balance.user_phone
-                            }
-                            className="h-8 w-8 p-0"
-                            title="Send Balance Notification"
-                          >
-                            <Send className="h-4 w-4" />
-                            <span className="sr-only">
-                              Send Balance Notification
-                            </span>
-                          </Button>
-                        )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => handleEdit(balance)}
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={!admin}
-                              onClick={() => confirmDelete(balance.user_id)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <BalanceTable
+              data={balances}
+              admin={admin}
+              whatsappStatus={whatsappStatus}
+              onViewTransactions={showUserTransactions}
+              onEdit={handleEdit}
+              onDelete={confirmDelete}
+              sendingNotification={sendingNotification}
+              onSendBalanceNotification={sendBalanceNotification}
+            />
           </div>
         )}
       </CardContent>

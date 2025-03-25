@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router";
 import { toast } from "sonner";
 import { z } from "zod";
 import TransactionsPage from "./components/transactions-page";
@@ -32,17 +33,21 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+const AuthGuard = ({ children }: { children: React.ReactElement }) => {
+  const { currentUser } = useContext(AppContext);
+
+  if (!currentUser?.id) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
 function App() {
-  const {
-    admin,
-    currentPage,
-    currentUser,
-    setCurrentPage,
-    setCurrentUser,
-    zkDeviceStatus,
-  } = useContext(AppContext);
+  const { admin, currentUser, setCurrentUser, zkDeviceStatus } =
+    useContext(AppContext);
   const [showLogin, setShowLogin] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   // Initialize form
   const form = useForm<FormValues>({
@@ -56,7 +61,6 @@ function App() {
     setIsSubmitting(true);
     try {
       setShowLogin(true);
-      // hard code password and prompt user to enter passwrd to login
       const password = prompt("Enter password to login");
       if (password !== "6479") {
         toast.error("Invalid password");
@@ -73,6 +77,7 @@ function App() {
       setCurrentUser(user);
       toast.success("User logged in successfully");
       form.reset();
+      navigate("/canteen");
     } catch (error) {
       console.error("Error getting User:", error);
       toast.error("Failed to login");
@@ -84,6 +89,7 @@ function App() {
   const handleInteraction = () => {
     setShowLogin(true);
   };
+
   return (
     <div className="min-h-screen ">
       <div
@@ -92,36 +98,33 @@ function App() {
           zkDeviceStatus ? "bg-green-500" : "bg-pink-700"
         )}
       ></div>
-      {currentPage != "screenSaver" && (
+      {currentUser && (
         <nav className="shadow-sm">
           <div className="container mx-auto p-4">
             <div className="flex">
               {admin && (
                 <div className="ml-6 flex space-x-8">
-                  <button
-                    onClick={() => setCurrentPage("canteen")}
+                  <NavLink
+                    to="/canteen"
                     className={navigationMenuTriggerStyle()}
                   >
                     Canteen
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage("products")}
+                  </NavLink>
+                  <NavLink
+                    to="/products"
                     className={navigationMenuTriggerStyle()}
                   >
                     Products
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage("users")}
-                    className={navigationMenuTriggerStyle()}
-                  >
+                  </NavLink>
+                  <NavLink to="/users" className={navigationMenuTriggerStyle()}>
                     Users
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage("transactions")}
+                  </NavLink>
+                  <NavLink
+                    to="/transactions"
                     className={navigationMenuTriggerStyle()}
                   >
                     Transactions
-                  </button>
+                  </NavLink>
                 </div>
               )}
               <div className="ml-auto flex gap-2 items-center">
@@ -129,6 +132,7 @@ function App() {
                   variant="destructive"
                   onClick={() => {
                     setCurrentUser(null);
+                    navigate("/login");
                   }}
                 >
                   Logout {currentUser?.name || "Guest"}
@@ -140,72 +144,108 @@ function App() {
         </nav>
       )}
       <main>
-        {currentPage === "canteen" && <CanteenPage />}
-        {currentPage === "products" && <ProductPage />}
-        {currentPage === "users" && <UserPage />}
+        <Routes>
+          <Route
+            path="/canteen"
+            element={
+              <AuthGuard>
+                <CanteenPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/products"
+            element={
+              <AuthGuard>
+                <ProductPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/users"
+            element={
+              <AuthGuard>
+                <UserPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/transactions"
+            element={
+              <AuthGuard>
+                <TransactionsPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              showLogin && !currentUser?.id ? (
+                <div className="flex h-screen w-full overflow items-center justify-center bg-background">
+                  <Card className="w-[350px]">
+                    <CardHeader>
+                      <CardTitle className="text-center">Admin Login</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <Form {...form}>
+                        <form
+                          onSubmit={form.handleSubmit(onSubmit)}
+                          className="space-y-4"
+                        >
+                          <FormField
+                            control={form.control}
+                            name="employee_id"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Employee ID</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="Enter employee ID"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-        {currentPage === "transactions" && <TransactionsPage />}
+                          <Button
+                            className="w-full"
+                            type="submit"
+                            disabled={isSubmitting}
+                          >
+                            {isSubmitting ? "Validating..." : "Login"}
+                          </Button>
+                        </form>
+                      </Form>
+                    </CardContent>
 
-        {currentPage === "screenSaver" && !showLogin && (
-          <div
-            className="flex h-screen w-full overflow-hidden relative items-center justify-center bg-background"
-            onClick={handleInteraction}
-            onTouchStart={handleInteraction}
-            onMouseMove={handleInteraction}
-          >
-            <Screensaver />
-          </div>
-        )}
-        {showLogin && !currentUser?.id && (
-          <div className="flex h-screen w-full overflow items-center justify-center bg-background">
-            <Card className="w-[350px]">
-              <CardHeader>
-                <CardTitle className="text-center">Admin Login</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={form.control}
-                      name="employee_id"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Employee ID</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter employee ID" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Button
-                      className="w-full"
-                      type="submit"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? "Validating..." : "Login"}
-                    </Button>
-                  </form>
-                </Form>
-              </CardContent>
-
-              <div className="flex justify-center p-4">
-                <Button
-                  variant="outline"
-                  className="text-sm w-full"
-                  onClick={() => setShowLogin(false)}
-                  type="button"
+                    <div className="flex justify-center p-4">
+                      <Button
+                        variant="outline"
+                        className="text-sm w-full"
+                        onClick={() => setShowLogin(false)}
+                        type="button"
+                      >
+                        back to screensaver
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
+              ) : (
+                <div
+                  className="flex h-screen w-full overflow-hidden relative items-center justify-center bg-background"
+                  onClick={handleInteraction}
+                  onTouchStart={handleInteraction}
+                  onMouseMove={handleInteraction}
                 >
-                  back to screensaver
-                </Button>
-              </div>
-            </Card>
-          </div>
-        )}
+                  <Screensaver />
+                </div>
+              )
+            }
+          />
+          <Route path="*" element={<Navigate to="/screensaver" />} />
+        </Routes>
       </main>
     </div>
   );
@@ -245,7 +285,7 @@ function Screensaver() {
     "  _____",
     " /     \\",
     "|  o o  |",
-    "|    ᴥ   |",
+    "|      ᴥ  |",
     " \\_____/",
     "",
     "   ____",
