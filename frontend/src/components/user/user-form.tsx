@@ -6,6 +6,7 @@ import * as z from "zod";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -54,6 +55,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
       name: "",
       employee_id: "",
       phone: "",
+      active: true,
     },
   });
 
@@ -65,8 +67,8 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
         employee_id: data.employee_id,
         department: data.department,
         phone: data.phone,
+        active: data.active,
       });
-
       toast.success("User added successfully");
       form.reset();
       onUserAdded();
@@ -185,6 +187,27 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
                     <Input placeholder="+92 345 2324442" {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="active"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4 border">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Active</FormLabel>
+                    <FormDescription>
+                      Mark user as active to allow system access
+                    </FormDescription>
+                  </div>
                 </FormItem>
               )}
             />

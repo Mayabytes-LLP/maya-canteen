@@ -19,6 +19,7 @@ type Product struct {
 	Description     string      `json:"description"`
 	Price           float64     `json:"price"`
 	Type            ProductType `json:"type"`
+	Active          bool        `json:"active"`
 	IsSingleUnit    bool        `json:"is_single_unit"`    // For cigarettes: true if single, false if packet
 	SingleUnitPrice float64     `json:"single_unit_price"` // For cigarettes: true if single, false if packet
 	CreatedAt       time.Time   `json:"created_at"`

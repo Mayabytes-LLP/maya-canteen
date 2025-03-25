@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 
 import {
   flexRender,
@@ -12,17 +13,7 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import {
-  CreditCard,
-  MoreHorizontal,
-  Pencil,
-  Search,
-  Send,
-  SendToBack,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { MoreHorizontal, Pencil, Search, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -41,32 +32,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-import type { UserBalance as Balance } from "@/services/transaction-service";
+import type { Product } from "@/services/transaction-service";
 
 import { Badge } from "@/components/ui/badge";
-import { CopyButton } from "@/components/ui/copy-button";
 
-interface BalanceTableProps {
-  data: Balance[];
+interface productTableProps {
+  data: Product[];
   admin?: boolean;
-  whatsappStatus: { connected: boolean };
-  onViewTransactions: (employeeId: string) => void;
-  onEdit: (balance: Balance) => void;
-  onDelete: (userId: number) => void;
-  onSendBalanceNotification: (employeeId: string) => void;
-  sendingNotification: boolean;
+  onEdit: (product: Product) => void;
+  onDelete: (product: Product) => void;
 }
 
-export function BalanceTable({
+export function ProductTable({
   data,
   admin = false,
-  whatsappStatus,
-  onViewTransactions,
   onEdit,
   onDelete,
-  onSendBalanceNotification,
-  sendingNotification,
-}: BalanceTableProps) {
+}: productTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
@@ -77,7 +59,7 @@ export function BalanceTable({
     if (searchQuery) {
       setColumnFilters([
         {
-          id: "user_name",
+          id: "name",
           value: searchQuery,
         },
       ]);
@@ -86,29 +68,13 @@ export function BalanceTable({
     }
   }, [searchQuery]);
 
-  // Generate WhatsApp URL function
-  const generateWhatsappUrl = (
-    phone: string,
-    name: string,
-    balance: number
-  ) => {
-    const message = `Hello ${name}, your current balance is PKR ${balance?.toFixed(
-      2
-    )}`;
-    return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  };
-
   // Define columns
-  const columns: ColumnDef<Balance>[] = [
+  const columns: ColumnDef<Product>[] = [
     {
-      accessorKey: "employee_id",
-      header: "ID",
-    },
-    {
-      accessorKey: "user_name",
+      accessorKey: "name",
       header: "Name",
       cell: ({ row }) => (
-        <div className="font-medium">{`${row.original.user_name} (${row.original.user_department})`}</div>
+        <div className="font-medium">{`${row.original.name}`}</div>
       ),
       filterFn: (row, id, value) => {
         return (
@@ -121,27 +87,34 @@ export function BalanceTable({
       },
     },
     {
-      accessorKey: "user_phone",
-      header: "Phone",
-      cell: ({ row }) => (
-        <div className="flex space-x-2">
-          <span className="p-1 bg-zinc-700 w-28 text-center rounded">
-            {row.original.user_phone}
-          </span>
-          <CopyButton value={row.original.user_phone} />
-        </div>
-      ),
+      accessorKey: "description",
+      header: "Description",
     },
     {
-      accessorKey: "balance",
-      header: "Balance (PKR)",
-      cell: ({ row }) => row.original.balance?.toFixed(2),
+      accessorKey: "price",
+      header: "Price",
     },
     {
-      accessorKey: "user_active",
+      accessorKey: "single_unit_price",
+      header: "Single Unit Price",
+    },
+    {
+      accessorKey: "is_single_unit",
+      header: "Single Unit",
+      cell: ({ row }) => {
+        const isSingleUnit = row.original.is_single_unit !== false; // Default to true if undefined
+        return (
+          <Badge variant={isSingleUnit ? "default" : "destructive"}>
+            {isSingleUnit ? "Yes" : "No"}
+          </Badge>
+        );
+      },
+    },
+    {
+      accessorKey: "active",
       header: "Status",
       cell: ({ row }) => {
-        const isActive = row.original.user_active !== false; // Default to true if undefined
+        const isActive = row.original.active !== false; // Default to true if undefined
         return (
           <Badge variant={isActive ? "default" : "destructive"}>
             {isActive ? "Active" : "Inactive"}
@@ -153,57 +126,10 @@ export function BalanceTable({
       id: "actions",
       header: "Actions",
       cell: ({ row }) => {
-        const balance = row.original;
+        const product = row.original;
 
         return (
           <div className="flex items-center space-x-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onViewTransactions(balance.employee_id)}
-              className="h-8 w-8 p-0"
-              title="View Transactions"
-            >
-              <CreditCard className="h-4 w-4" />
-              <span className="sr-only">View Transactions</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                window.open(
-                  generateWhatsappUrl(
-                    balance.user_phone,
-                    balance.user_name,
-                    balance.balance
-                  ),
-                  "_blank"
-                )
-              }
-              disabled={sendingNotification || !balance.user_phone}
-              className="h-8 w-8 p-0"
-              title="Send Balance Notification"
-            >
-              <SendToBack className="h-4 w-4" />
-              <span className="sr-only">Send Balance Notification</span>
-            </Button>
-            {admin && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onSendBalanceNotification(balance.employee_id)}
-                disabled={
-                  sendingNotification ||
-                  !whatsappStatus.connected ||
-                  !balance.user_phone
-                }
-                className="h-8 w-8 p-0"
-                title="Send Balance Notification"
-              >
-                <Send className="h-4 w-4" />
-                <span className="sr-only">Send Balance Notification</span>
-              </Button>
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -212,13 +138,13 @@ export function BalanceTable({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => onEdit(balance)}>
+                <DropdownMenuItem onClick={() => onEdit(product)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   disabled={!admin}
-                  onClick={() => onDelete(balance.user_id)}
+                  onClick={() => onDelete(product)}
                   className="text-red-600"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />

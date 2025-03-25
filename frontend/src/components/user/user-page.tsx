@@ -44,6 +44,20 @@ const userCsvSchema = z.object({
 
       return val;
     }),
+  active: z
+    .union([z.boolean(), z.string()])
+    .optional()
+    .transform((val) => {
+      if (typeof val === "boolean") return val;
+      if (typeof val === "string") {
+        const lowercaseVal = val.toLowerCase();
+        if (["true", "yes", "1", "active"].includes(lowercaseVal)) return true;
+        if (["false", "no", "0", "inactive"].includes(lowercaseVal))
+          return false;
+      }
+      // Default to true if not specified or invalid
+      return true;
+    }),
 });
 
 type UserCsvRow = z.infer<typeof userCsvSchema>;
@@ -172,12 +186,14 @@ export default function UserPage() {
                   employee_id: "12345",
                   department: "Development",
                   phone: "+923001234567",
+                  active: "true",
                 },
                 {
                   name: "Jane Smith",
                   employee_id: "12346",
                   department: "HR",
                   phone: "03001234568",
+                  active: "false",
                 },
               ]);
               const blob = new Blob([csvContent], { type: "text/csv" });

@@ -40,6 +40,7 @@ import * as z from "zod";
 import { Button } from "../ui/button";
 import UserTransactions from "./user-transactions";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -88,6 +89,7 @@ export default function UserBalances({
       name: "",
       employee_id: "",
       phone: "",
+      active: true,
     },
   });
 
@@ -164,6 +166,7 @@ export default function UserBalances({
       "department",
       currentUser.department as FormValues["department"]
     );
+    form.setValue("active", currentUser.active);
     setOpenEditDialog(true);
   };
 
@@ -178,6 +181,7 @@ export default function UserBalances({
         employee_id: data.employee_id,
         department: data.department,
         phone: data.phone,
+        active: data.active,
       });
 
       // Update the local state
@@ -190,6 +194,7 @@ export default function UserBalances({
                 department: data.department,
                 employee_id: data.employee_id,
                 phone: data.phone,
+                active: data.active,
               }
             : user
         )
@@ -204,6 +209,7 @@ export default function UserBalances({
                 user_department: data.department,
                 employee_id: data.employee_id,
                 user_phone: data.phone,
+                user_active: data.active,
               }
             : balance
         )
@@ -412,6 +418,28 @@ export default function UserBalances({
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="active"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4 border">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>Active</FormLabel>
+                      <FormDescription>
+                        Mark user as active to allow system access
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
               <DialogFooter>
                 <DialogClose asChild>
                   <Button variant="outline">Cancel</Button>

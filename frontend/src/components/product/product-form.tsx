@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -23,20 +24,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Product, transactionService } from "@/services/transaction-service";
+import {
+  Product,
+  transactionService,
+  zodProductSchema,
+} from "@/services/transaction-service";
 import { Checkbox } from "../ui/checkbox";
 
-// Form validation schema
-const formSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  description: z.string(),
-  price: z.coerce.number().positive("Price must be a positive number"),
-  type: z.enum(["regular", "cigarette"]),
-  is_single_unit: z.boolean().default(false),
-  single_unit_price: z.coerce.number().min(0),
-});
-
-type FormValues = z.infer<typeof formSchema>;
+type FormValues = z.infer<typeof zodProductSchema>;
 
 interface ProductFormProps {
   onProductAdded: () => void;
@@ -54,13 +49,14 @@ export default function ProductForm({
     description: "",
     price: 5,
     type: "regular",
+    active: true,
     is_single_unit: false,
     single_unit_price: 0,
   };
 
   // Initialize form
   const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+    resolver: zodResolver(zodProductSchema),
     defaultValues,
   });
 
@@ -209,6 +205,27 @@ export default function ProductForm({
                     <Input type="number" step="1" placeholder="5" {...field} />
                   </FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="active"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md p-4 border">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Active</FormLabel>
+                    <FormDescription>
+                      Mark product as active to allow system access
+                    </FormDescription>
+                  </div>
                 </FormItem>
               )}
             />

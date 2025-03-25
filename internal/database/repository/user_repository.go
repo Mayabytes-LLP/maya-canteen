@@ -19,13 +19,17 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 // InitTable initializes the users table
 func (r *UserRepository) InitTable() error {
+	// First check if the active column exists, if not, add it
+	r.addActiveColumnIfNeeded()
+
 	query := `
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
 			department TEXT NOT NULL,
 			employee_id TEXT NOT NULL UNIQUE,
-    	phone TEXT,
+			phone TEXT,
+			active BOOLEAN NOT NULL DEFAULT 1,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)
@@ -40,12 +44,14 @@ func (r *UserRepository) InitTable() error {
 		EmployeeId: "10081",
 		Department: "Development Dept",
 		Phone:      "+923452324442",
+		Active:     true,
 	})
 	err2 := r.Create(&models.User{
 		Name:       "Qasim Imtiaz",
 		EmployeeId: "1023",
 		Department: "Development Dept",
 		Phone:      "+923452565003",
+		Active:     true,
 	})
 
 	err3 := r.Create(&models.User{
@@ -53,6 +59,7 @@ func (r *UserRepository) InitTable() error {
 		EmployeeId: "10024",
 		Department: "Admin Dept",
 		Phone:      "+923422949447",
+		Active:     true,
 	})
 
 	if err1 != nil || err2 != nil || err3 != nil {
@@ -62,19 +69,48 @@ func (r *UserRepository) InitTable() error {
 	return nil
 }
 
+// addActiveColumnIfNeeded checks if the active column exists and adds it if needed
+func (r *UserRepository) addActiveColumnIfNeeded() {
+	// Check if the column exists
+	var colExists bool
+	err := r.db.QueryRow(`
+		SELECT COUNT(*) > 0
+		FROM pragma_table_info('users')
+		WHERE name = 'active'
+	`).Scan(&colExists)
+
+	if err != nil || colExists {
+		return // Either error occurred or column already exists
+	}
+
+	// Add the column if it doesn't exist
+	_, err = r.db.Exec(`ALTER TABLE users ADD COLUMN active BOOLEAN NOT NULL DEFAULT 1`)
+	if err != nil {
+		fmt.Printf("Error adding active column: %v\n", err)
+	} else {
+		fmt.Println("Added active column to users table")
+	}
+}
+
 // Create inserts a new user into the database
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
-		INSERT INTO users (name, employee_id, department, phone, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO users (name, employee_id, department, phone, active, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
+	// If Active field is not explicitly set, default to true (active)
+	if !user.Active {
+		user.Active = true
+	}
+
 	result, err := r.db.Exec(
 		query,
 		user.Name,
 		user.EmployeeId,
 		user.Department,
 		user.Phone,
+		user.Active,
 		now,
 		now,
 	)
@@ -93,7 +129,7 @@ func (r *UserRepository) Create(user *models.User) error {
 
 // GetAll retrieves all users from the database
 func (r *UserRepository) GetAll() ([]models.User, error) {
-	query := `SELECT id, name, employee_id, department, phone, created_at, updated_at FROM users ORDER BY name ASC`
+	query := `SELECT id, name, employee_id, department, phone, active, created_at, updated_at FROM users ORDER BY name ASC`
 	rows, err := r.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -109,6 +145,7 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 			&user.EmployeeId,
 			&user.Department,
 			&user.Phone,
+			&user.Active,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -123,7 +160,7 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 // Get retrieves a single user by ID
 func (r *UserRepository) Get(id int64) (*models.User, error) {
 	fmt.Println("Get user by ID", id)
-	query := `SELECT id, name, employee_id, department, phone, created_at, updated_at FROM users WHERE employee_id = ?`
+	query := `SELECT id, name, employee_id, department, phone, active, created_at, updated_at FROM users WHERE employee_id = ?`
 	var user models.User
 	err := r.db.QueryRow(query, id).Scan(
 		&user.ID,
@@ -131,6 +168,7 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 		&user.EmployeeId,
 		&user.Department,
 		&user.Phone,
+		&user.Active,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -144,12 +182,35 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 	return &user, nil
 }
 
+// GetByEmployeeID retrieves a single user by employee ID
+func (r *UserRepository) GetByEmployeeID(employeeID string) (*models.User, error) {
+	query := `SELECT id, name, employee_id, department, phone, active, created_at, updated_at FROM users WHERE employee_id = ?`
+	var user models.User
+	err := r.db.QueryRow(query, employeeID).Scan(
+		&user.ID,
+		&user.Name,
+		&user.EmployeeId,
+		&user.Department,
+		&user.Phone,
+		&user.Active,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+	)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 // Update updates an existing user
 func (r *UserRepository) Update(user *models.User) error {
 	fmt.Println("Edit user by ID", user)
 	query := `
 		UPDATE users
-		SET name = ?, employee_id = ?, department = ?, phone = ?, updated_at = ?
+		SET name = ?, employee_id = ?, department = ?, phone = ?, active = ?, updated_at = ?
 		WHERE id = ?
 	`
 	now := time.Now()
@@ -159,6 +220,7 @@ func (r *UserRepository) Update(user *models.User) error {
 		user.EmployeeId,
 		user.Department,
 		user.Phone,
+		user.Active,
 		now,
 		user.ID,
 	)

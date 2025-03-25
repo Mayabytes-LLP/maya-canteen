@@ -24,6 +24,7 @@ export interface User {
   employee_id: string;
   department: string;
   phone: string;
+  active: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -34,6 +35,7 @@ export interface Product {
   description: string;
   price: number;
   type: "regular" | "cigarette";
+  active: boolean;
   is_single_unit: boolean;
   single_unit_price: number;
   created_at: string;
@@ -51,6 +53,7 @@ export interface UserBalance {
   employee_id: string;
   user_department: string;
   user_phone: string;
+  user_active: boolean;
   balance: number;
 }
 
@@ -109,6 +112,18 @@ export const zodUserSchema = z.object({
 
       return val;
     }),
+  active: z.boolean().default(true),
+});
+
+// Form validation schema
+export const zodProductSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  description: z.string(),
+  price: z.coerce.number().positive("Price must be a positive number"),
+  type: z.enum(["regular", "cigarette"]),
+  active: z.boolean().default(true),
+  is_single_unit: z.boolean().default(false),
+  single_unit_price: z.coerce.number().min(0),
 });
 
 export const transactionService = {
@@ -273,7 +288,10 @@ export const transactionService = {
   },
 
   async updateUser(
-    user: Pick<User, "id" | "name" | "employee_id" | "department" | "phone">
+    user: Pick<
+      User,
+      "id" | "name" | "employee_id" | "department" | "phone" | "active"
+    >
   ): Promise<User> {
     console.log(user);
     const response = await fetch(`${API_BASE}/users/${user.id}`, {
