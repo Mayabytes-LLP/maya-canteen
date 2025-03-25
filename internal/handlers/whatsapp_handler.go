@@ -581,7 +581,7 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 	// Get all users with balances
 	userBalances, err := h.DB.GetUsersBalances()
 	if err != nil {
-		common.RespondWithError(w, http.StatusInternalServerError, "Failed to get users' balances")
+		common.RespondWithError(w, http.StatusInternalServerError, "Failed to get user's balance")
 		return
 	}
 

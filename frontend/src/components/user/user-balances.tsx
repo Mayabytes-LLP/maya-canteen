@@ -98,7 +98,7 @@ export default function UserBalances({
         const balancesData = await transactionService.getUsersBalances();
         setBalances(balancesData ?? []);
       } catch (error) {
-        toast.error("Failed to load users' balances");
+        toast.error("Failed to load user's balance");
         console.error("Error fetching user balances:", error);
       } finally {
         setLoading(false);
@@ -255,7 +255,7 @@ export default function UserBalances({
   return (
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Users' Balances</CardTitle>
+        <CardTitle>User's Balance</CardTitle>
         {admin && (
           <Button
             onClick={sendAllBalanceNotifications}
