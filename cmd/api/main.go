@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"maya-canteen/internal/gozk"
 	"maya-canteen/internal/server"
@@ -13,6 +14,11 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types/events"
+	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
 // Setup database path to be configurable, default to current directory
@@ -112,7 +118,106 @@ func setupLogFile(filename string) (*os.File, error) {
 	return file, nil
 }
 
-func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, done chan bool) {
+// minimal event handler that only processes connection-related events
+func eventHandler(evt interface{}) {
+	switch v := evt.(type) {
+	case *events.Connected:
+		// Connected to WhatsApp
+		fmt.Println("Connected to WhatsApp")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "connected",
+			"message": "WhatsApp connected successfully",
+		})
+	case *events.LoggedOut:
+		// Logged out from WhatsApp
+		fmt.Println("Logged out from WhatsApp")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "WhatsApp logged out",
+		})
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+			"qr_code_base64": "",
+			"logged_in":      false,
+		})
+	case *events.StreamReplaced:
+		fmt.Println("Stream replaced")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "WhatsApp connected from another location",
+		})
+	default:
+		fmt.Printf("Unhandled event: %v\n", v)
+	}
+}
+
+func setupWhatsapp() *whatsmeow.Client {
+	dbLog := waLog.Stdout("Database", "INFO", true)
+	// Use a more reliable database path
+	dbPath, err := filepath.Abs("./whatsapp-store.db")
+	if err != nil {
+		log.Printf("Error getting absolute path: %v, using default", err)
+		dbPath = "file:whatsapp-store.db?_foreign_keys=on"
+	} else {
+		dbPath = fmt.Sprintf("file:%s?_foreign_keys=on", dbPath)
+	}
+
+	log.Printf("Using WhatsApp database at: %s", dbPath)
+	container, err := sqlstore.New("sqlite3", dbPath, dbLog)
+	if err != nil {
+		log.Printf("Failed to connect to WhatsApp database: %v", err)
+		panic(err)
+	}
+
+	// If you want multiple sessions, remember their JIDs and use .GetDevice(jid) or .GetAllDevices() instead.
+	deviceStore, err := container.GetFirstDevice()
+	if err != nil {
+		log.Printf("Failed to get WhatsApp device: %v", err)
+		panic(err)
+	}
+
+	// Create client with specific options to disable history sync
+	client := whatsmeow.NewClient(deviceStore, nil)
+
+	// Only add event handler for essential events (connection status)
+	client.AddEventHandler(eventHandler)
+
+	// Register the WhatsApp client with the WebSocket handler for refresh capability
+	routes.GlobalWebSocketHandler.SetWhatsAppClient(client)
+	routes.GlobalWebSocketHandler.RegisterQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
+		return client.GetQRChannel(ctx)
+	})
+
+	// Initialize with disconnected status - we'll connect only on demand
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+		"status":  "disconnected",
+		"message": "WhatsApp initialized but not connected",
+	})
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+		"qr_code_base64": "",
+		"logged_in":      false,
+	})
+
+	// Check if we already have credentials
+	if client.Store.ID != nil {
+		log.Println("WhatsApp credentials found, checking connection status...")
+		// Inform the frontend that credentials exist
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "WhatsApp credentials found, click refresh to connect",
+		})
+	} else {
+		// No credentials, inform the frontend
+		log.Println("No WhatsApp credentials found, will need to scan QR code")
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+			"status":  "disconnected",
+			"message": "No WhatsApp credentials found, click refresh to get QR code",
+		})
+	}
+
+	return client
+}
+
+func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whatsmeow.Client, done chan bool) {
 	// Create context that listens for the interrupt signal from the OS.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -127,6 +232,9 @@ func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, done chan bool)
 
 	zkSocket.Disconnect()
 	log.Println("ZK device disconnected")
+
+	whatsapp.Disconnect()
+	log.Println("Whatsapp disconnected")
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
@@ -154,9 +262,10 @@ func main() {
 	eventLogger := log.New(logFile, "", log.LstdFlags)
 	apiServer := server.NewServer()
 	zkSocket := setupZKDevice(eventLogger)
+	whatsapp := setupWhatsapp()
 
 	done := make(chan bool, 1)
-	go gracefulShutdown(apiServer, zkSocket, done)
+	go gracefulShutdown(apiServer, zkSocket, whatsapp, done)
 
 	// Start the API server
 	log.Println("Starting API server")

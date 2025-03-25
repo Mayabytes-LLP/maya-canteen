@@ -15,14 +15,16 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RefreshCw } from "lucide-react";
+import { AppContext } from "@/context";
+import { LoaderCircle, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { AppContext } from "./canteen-provider";
+import { toast } from "sonner";
 
 export default function TransactionsPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [transactionLimit, setTransactionLimit] = useState(50);
   const [inputLimit, setInputLimit] = useState("10");
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { whatsappQR, whatsappStatus, ws } = useContext(AppContext);
 
@@ -49,7 +51,17 @@ export default function TransactionsPage() {
   // Function to manually refresh the WhatsApp connection
   const refreshWhatsApp = () => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      setIsRefreshing(true);
+      // Send refresh command to backend
       ws.current.send(JSON.stringify({ type: "refresh_whatsapp" }));
+      toast.info("Connecting to WhatsApp...");
+
+      // Set a timeout to reset the refreshing state after a reasonable time
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 30000); // Reset after 30 seconds max
+    } else {
+      toast.error("WebSocket not connected");
     }
   };
 
@@ -68,7 +80,11 @@ export default function TransactionsPage() {
                 <div>
                   <CardTitle>WhatsApp Connection</CardTitle>
                   <CardDescription>
-                    Scan the QR code to login with WhatsApp
+                    {whatsappQR
+                      ? "Scan the QR code to login with WhatsApp"
+                      : whatsappStatus.connected
+                      ? "WhatsApp is connected and ready to send messages"
+                      : "Click refresh to connect WhatsApp"}
                   </CardDescription>
                 </div>
                 <Badge
@@ -88,6 +104,7 @@ export default function TransactionsPage() {
                     value={whatsappQR}
                     size={240}
                     level="H"
+                    includeMargin={true}
                     className="p-2 bg-white rounded-md border"
                   />
                   <p className="mt-2 text-sm text-muted-foreground">
@@ -118,9 +135,21 @@ export default function TransactionsPage() {
                 variant="outline"
                 onClick={refreshWhatsApp}
                 className="flex gap-2 items-center"
+                disabled={isRefreshing}
               >
-                <RefreshCw className="h-4 w-4" />
-                Refresh WhatsApp Connection
+                {isRefreshing ? (
+                  <>
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    {whatsappStatus.connected
+                      ? "Refresh Connection"
+                      : "Connect WhatsApp"}
+                  </>
+                )}
               </Button>
             </CardFooter>
           </Card>

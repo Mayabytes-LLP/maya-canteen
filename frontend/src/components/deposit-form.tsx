@@ -38,8 +38,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { AppContext } from "@/context";
 import { cn } from "@/lib/utils";
-import { AppContext } from "./canteen-provider";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import {

@@ -2,8 +2,8 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-import { AppProvider } from "@/components/canteen-provider.tsx";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AppProvider } from "@/context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { Toaster } from "sonner";
@@ -27,5 +27,5 @@ createRoot(document.getElementById("root")!).render(
       </AppProvider>
       {/* <ReactQueryDevtools initialIsOpen={false} /> */}
     </ThemeProvider>
-  </QueryClientProvider>,
+  </QueryClientProvider>
 );

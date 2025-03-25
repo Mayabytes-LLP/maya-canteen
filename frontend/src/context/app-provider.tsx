@@ -1,47 +1,7 @@
-import { transactionService, User } from "@/services/transaction-service";
-import { createContext, useEffect, useRef, useState, type FC } from "react";
+import { transactionService } from "@/services/transaction-service";
+import { useEffect, useRef, useState, type FC } from "react";
 import { toast } from "sonner";
-
-export interface AppState {
-  admin: boolean;
-  currentPage:
-    | "canteen"
-    | "transactions"
-    | "products"
-    | "users"
-    | "screenSaver";
-  currentUser: User | null;
-  zkDeviceStatus: boolean;
-  whatsappStatus: {
-    connected: boolean;
-    message: string;
-  };
-  setCurrentPage: (
-    page: "canteen" | "products" | "users" | "screenSaver" | "transactions",
-  ) => void;
-  setCurrentUser: (user: User | null) => void;
-  setAdmin: (admin: boolean) => void;
-  ws: React.RefObject<WebSocket | null>;
-  whatsappQR: string | null;
-}
-
-export const initialState: AppState = {
-  admin: false,
-  currentPage: "canteen",
-  currentUser: null,
-  zkDeviceStatus: false,
-  whatsappStatus: {
-    connected: false,
-    message: "Disconnected",
-  },
-  setCurrentPage: () => null,
-  setCurrentUser: () => null,
-  setAdmin: () => null,
-  ws: { current: null },
-  whatsappQR: null,
-};
-
-export const AppContext = createContext<AppState>(initialState);
+import { AppContext, initialState } from "./app-context";
 
 type Props = {
   children?: React.ReactNode;
@@ -51,12 +11,12 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
   const [currentPage, setCurrentPage] = useState(initialState.currentPage);
   const [zkDeviceStatus, setZkDeviceStatus] = useState<boolean>(
-    initialState.zkDeviceStatus,
+    initialState.zkDeviceStatus
   );
   const [currentUser, setCurrentUser] = useState(initialState.currentUser);
   const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState(
-    initialState.whatsappStatus,
+    initialState.whatsappStatus
   );
 
   const ws = useRef<WebSocket | null>(null);
@@ -167,7 +127,6 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
       }
     };
   }, []);
-
   useEffect(() => {
     console.log("currentUser", currentUser);
     if (!currentUser?.id) {
@@ -187,7 +146,6 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
     }
     return;
   }, [admin, currentUser]);
-
   const value = {
     admin,
     currentPage,

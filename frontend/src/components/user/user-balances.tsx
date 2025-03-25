@@ -46,13 +46,15 @@ import {
   Check,
   ChevronsUpDown,
   CreditCard,
+  MessageCircle,
   MoreHorizontal,
   Pencil,
+  Send,
+  SendToBack,
   Trash2,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { AppContext } from "../canteen-provider";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -71,6 +73,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { AppContext } from "@/context";
 import { CopyButton } from "../ui/copy-button";
 
 type FormValues = z.infer<typeof formSchema>;
@@ -97,8 +100,10 @@ export default function UserBalances({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userPopover, setUserPopover] = useState(false);
+  const [sendingNotification, setSendingNotification] = useState(false);
+  const [sendingAllNotifications, setSendingAllNotifications] = useState(false);
 
-  const { admin } = useContext(AppContext);
+  const { admin, whatsappStatus } = useContext(AppContext);
 
   // Initialize form
   const form = useForm<FormValues>({
@@ -126,6 +131,46 @@ export default function UserBalances({
 
     fetchBalances();
   }, [refreshTrigger]);
+
+  // Function to send balance notification to a single user
+  const sendBalanceNotification = async (employeeId: string) => {
+    setSendingNotification(true);
+    try {
+      const response = await transactionService.sendBalanceNotification(
+        employeeId
+      );
+      if (response.success) {
+        toast.success(
+          `Balance notification sent to user with ID ${employeeId}`
+        );
+      } else {
+        toast.error("Failed to send balance notification");
+      }
+    } catch (error) {
+      console.error("Error sending balance notification:", error);
+      toast.error("Failed to send balance notification");
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  // Function to send balance notifications to all users
+  const sendAllBalanceNotifications = async () => {
+    setSendingAllNotifications(true);
+    try {
+      const response = await transactionService.sendAllBalanceNotifications();
+      if (response.success) {
+        toast.success("Balance notifications sent to all users");
+      } else {
+        toast.error("Failed to send balance notifications to all users");
+      }
+    } catch (error) {
+      console.error("Error sending all balance notifications:", error);
+      toast.error("Failed to send balance notifications to all users");
+    } finally {
+      setSendingAllNotifications(false);
+    }
+  };
 
   const handleEdit = async (user: UserBalance) => {
     const currentUser = await transactionService.getUser(user.employee_id);
@@ -166,8 +211,8 @@ export default function UserBalances({
                 employee_id: data.employee_id,
                 phone: data.phone,
               }
-            : user,
-        ),
+            : user
+        )
       );
 
       setBalances(
@@ -180,8 +225,8 @@ export default function UserBalances({
                 employee_id: data.employee_id,
                 user_phone: data.phone,
               }
-            : balance,
-        ),
+            : balance
+        )
       );
 
       toast.success("User updated successfully");
@@ -226,10 +271,38 @@ export default function UserBalances({
     setOpenTransactionsDialog(true);
   };
 
+  const generateWhatsappUrl = (
+    phone: string,
+    name: string,
+    balance: number
+  ) => {
+    const message = `Balance Update\n\nDear ${name},\n\nYour current canteen balance is: PKR ${balance.toFixed(
+      2
+    )}\n\nThis is an automated message from Maya Canteen Management System.`;
+
+    const encodedMessage = encodeURIComponent(message);
+    return `https://wa.me/${phone}?text=${encodedMessage}`;
+  };
+
   return (
     <Card className="w-full">
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Users' Balances</CardTitle>
+        {admin && (
+          <Button
+            onClick={sendAllBalanceNotifications}
+            disabled={sendingAllNotifications || !whatsappStatus.connected}
+            className="flex items-center gap-2"
+          >
+            {sendingAllNotifications ? (
+              "Sending..."
+            ) : (
+              <>
+                <MessageCircle className="h-4 w-4" /> Send All Balances
+              </>
+            )}
+          </Button>
+        )}
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -245,20 +318,20 @@ export default function UserBalances({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>ID</TableHead>
                   <TableHead>Name</TableHead>
-                  <TableHead>Employee ID</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Balance (PKR)</TableHead>
-                  <TableHead className="w-[120px]">Actions</TableHead>
+                  <TableHead className="w-[150px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {balances.map((balance) => (
                   <TableRow key={balance.user_id}>
+                    <TableCell>{balance.employee_id}</TableCell>
                     <TableCell className="font-medium">
                       {`${balance.user_name} (${balance.user_department})`}
                     </TableCell>
-                    <TableCell>{balance.employee_id}</TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
                         <span className="p-1 bg-zinc-700 w-28 text-center rounded">
@@ -285,7 +358,49 @@ export default function UserBalances({
                           <CreditCard className="h-4 w-4" />
                           <span className="sr-only">View Transactions</span>
                         </Button>
-
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            window.open(
+                              generateWhatsappUrl(
+                                balance.user_phone,
+                                balance.user_name,
+                                balance.balance
+                              ),
+                              "_blank"
+                            )
+                          }
+                          disabled={sendingNotification || !balance.user_phone}
+                          className="h-8 w-8 p-0"
+                          title="Send Balance Notification"
+                        >
+                          <SendToBack className="h-4 w-4" />
+                          <span className="sr-only">
+                            Send Balance Notification
+                          </span>
+                        </Button>
+                        {admin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              sendBalanceNotification(balance.employee_id)
+                            }
+                            disabled={
+                              sendingNotification ||
+                              !whatsappStatus.connected ||
+                              !balance.user_phone
+                            }
+                            className="h-8 w-8 p-0"
+                            title="Send Balance Notification"
+                          >
+                            <Send className="h-4 w-4" />
+                            <span className="sr-only">
+                              Send Balance Notification
+                            </span>
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -375,7 +490,7 @@ export default function UserBalances({
                             role="combobox"
                             className={cn(
                               "w-full justify-between",
-                              !field.value && "text-muted-foreground",
+                              !field.value && "text-muted-foreground"
                             )}
                           >
                             {field.value || "Select Department"}
@@ -407,7 +522,7 @@ export default function UserBalances({
                                       "ml-auto",
                                       department === field.value
                                         ? "opacity-100"
-                                        : "opacity-0",
+                                        : "opacity-0"
                                     )}
                                   />
                                 </CommandItem>

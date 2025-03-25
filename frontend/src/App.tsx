@@ -1,8 +1,8 @@
 import CanteenPage from "@/components/canteen-page";
-import { AppContext } from "@/components/canteen-provider";
 import { ModeToggle } from "@/components/mode-toggle";
 import ProductPage from "@/components/product/product-page";
 import UserPage from "@/components/user/user-page";
+import { AppContext } from "@/context";
 import { useContext, useEffect, useState } from "react";
 import { navigationMenuTriggerStyle } from "./components/ui/navigation-menu";
 
@@ -245,7 +245,7 @@ function Screensaver() {
     "  _____",
     " /     \\",
     "|  o o  |",
-    "|   ᴥ   |",
+    "|    ᴥ   |",
     " \\_____/",
     "",
     "   ____",

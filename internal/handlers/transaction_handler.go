@@ -241,7 +241,6 @@ func (h *TransactionHandler) GetUsersBalances(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	log.Printf("Fetched user balances: %v", balances)
 	common.RespondWithSuccess(w, http.StatusOK, balances)
 }
 

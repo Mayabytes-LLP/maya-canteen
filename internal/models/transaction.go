@@ -17,11 +17,11 @@ type Transaction struct {
 
 // EmployeeTransaction represents a financial transaction with user details
 type EmployeeTransaction struct {
+	ID              int64     `json:"id"`
 	UserID          int64     `json:"user_id"`
 	UserName        string    `json:"user_name"`
 	EmployeeID      string    `json:"employee_id"`
 	Department      string    `json:"department"`
-	TransactionID   int64     `json:"transaction_id"`
 	Amount          float64   `json:"amount"`
 	Description     string    `json:"description"`
 	TransactionType string    `json:"transaction_type"`

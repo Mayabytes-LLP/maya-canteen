@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 
 import { Check, ChevronsUpDown, Trash2 } from "lucide-react";
 
-import { AppContext } from "@/components/canteen-provider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { AppContext } from "@/context";
 
 import { Product, transactionService } from "@/services/transaction-service";
 
@@ -239,11 +239,13 @@ export default function TransactionForm({
       };
 
       await transactionService.createTransaction(transaction);
-      toast.success("Transaction added successfully");
       form.reset(defaultValues);
       setCartItems([]);
       onTransactionAdded();
       setCurrentUser(null);
+      toast.success(
+        `Transaction added successfully for User: ${currentUser.name}, Amount: ${finalAmount}`
+      );
     } catch (error) {
       toast.error("Failed to add transaction");
       console.error(error);
