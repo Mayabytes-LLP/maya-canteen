@@ -57,10 +57,15 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
+          # Install rcedit tool to modify Windows executables
+          choco install rcedit -y
+          # Build the application without icon first
           $env:CGO_ENABLED=1
           $env:GOOS="windows"
           $env:GOARCH="amd64"
           go build -o ${{ matrix.output_name }} cmd/api/main.go
+          # Use rcedit to add icon
+          rcedit "${{ matrix.output_name }}" --set-icon "frontend/public/mayabytes-favicon-270x270.png"
 
       - name: Build Backend for Linux/macOS
         if: matrix.os != 'windows-latest'
