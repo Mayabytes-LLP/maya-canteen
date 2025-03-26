@@ -4,8 +4,21 @@ import CanteenPage from "@/pages/canteen-page";
 import ProductPage from "@/pages/product-page";
 import ProductSalesPage from "@/pages/product-sales-page";
 import UserPage from "@/pages/user-page";
+import { Menu } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
-import { navigationMenuTriggerStyle } from "./components/ui/navigation-menu";
+import {
+  NavigationMenu,
+  NavigationMenuItem,
+  NavigationMenuList,
+  navigationMenuTriggerStyle,
+} from "./components/ui/navigation-menu";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./components/ui/sheet";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -101,47 +114,193 @@ function App() {
         )}
       ></div>
       {currentUser && (
-        <nav className="shadow-sm">
+        <nav className="shadow-sm border-b">
           <div className="container mx-auto p-4">
-            <div className="flex">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <h2 className="text-lg font-bold">Maya Canteen</h2>
+
+                {/* Desktop Navigation */}
+                {admin && (
+                  <div className="hidden md:flex ml-6">
+                    <NavigationMenu>
+                      <NavigationMenuList>
+                        <NavigationMenuItem>
+                          <NavLink
+                            to="/dashboard"
+                            className={({ isActive }) =>
+                              cn(
+                                navigationMenuTriggerStyle(),
+                                isActive && "bg-accent text-accent-foreground"
+                              )
+                            }
+                          >
+                            Dashboard
+                          </NavLink>
+                        </NavigationMenuItem>
+                        <NavigationMenuItem>
+                          <NavLink
+                            to="/product-sales"
+                            className={({ isActive }) =>
+                              cn(
+                                navigationMenuTriggerStyle(),
+                                isActive && "bg-accent text-accent-foreground"
+                              )
+                            }
+                          >
+                            Product Sales
+                          </NavLink>
+                        </NavigationMenuItem>
+                        <NavigationMenuItem>
+                          <NavLink
+                            to="/canteen"
+                            className={({ isActive }) =>
+                              cn(
+                                navigationMenuTriggerStyle(),
+                                isActive && "bg-accent text-accent-foreground"
+                              )
+                            }
+                          >
+                            Canteen
+                          </NavLink>
+                        </NavigationMenuItem>
+                        <NavigationMenuItem>
+                          <NavLink
+                            to="/products"
+                            className={({ isActive }) =>
+                              cn(
+                                navigationMenuTriggerStyle(),
+                                isActive && "bg-accent text-accent-foreground"
+                              )
+                            }
+                          >
+                            Products
+                          </NavLink>
+                        </NavigationMenuItem>
+                        <NavigationMenuItem>
+                          <NavLink
+                            to="/users"
+                            className={({ isActive }) =>
+                              cn(
+                                navigationMenuTriggerStyle(),
+                                isActive && "bg-accent text-accent-foreground"
+                              )
+                            }
+                          >
+                            Users
+                          </NavLink>
+                        </NavigationMenuItem>
+                        <NavigationMenuItem>
+                          <NavLink
+                            to="/transactions"
+                            className={({ isActive }) =>
+                              cn(
+                                navigationMenuTriggerStyle(),
+                                isActive && "bg-accent text-accent-foreground"
+                              )
+                            }
+                          >
+                            Transactions
+                          </NavLink>
+                        </NavigationMenuItem>
+                      </NavigationMenuList>
+                    </NavigationMenu>
+                  </div>
+                )}
+              </div>
+
+              {/* Mobile Navigation */}
               {admin && (
-                <div className="ml-6 flex space-x-8">
-                  <NavLink
-                    to="/dashboard"
-                    className={navigationMenuTriggerStyle()}
-                  >
-                    Dashboard
-                  </NavLink>
-                  <NavLink
-                    to="/product-sales"
-                    className={navigationMenuTriggerStyle()}
-                  >
-                    Product Sales
-                  </NavLink>
-                  <NavLink
-                    to="/canteen"
-                    className={navigationMenuTriggerStyle()}
-                  >
-                    Canteen
-                  </NavLink>
-                  <NavLink
-                    to="/products"
-                    className={navigationMenuTriggerStyle()}
-                  >
-                    Products
-                  </NavLink>
-                  <NavLink to="/users" className={navigationMenuTriggerStyle()}>
-                    Users
-                  </NavLink>
-                  <NavLink
-                    to="/transactions"
-                    className={navigationMenuTriggerStyle()}
-                  >
-                    Transactions
-                  </NavLink>
+                <div className="md:hidden">
+                  <Sheet>
+                    <SheetTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-9 w-9 p-0"
+                      >
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">Toggle menu</span>
+                      </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left">
+                      <SheetHeader className="pb-4">
+                        <SheetTitle>Maya Canteen</SheetTitle>
+                      </SheetHeader>
+                      <div className="grid gap-2 py-4">
+                        <NavLink
+                          to="/dashboard"
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center py-2 px-3 rounded-md hover:bg-accent",
+                              isActive && "bg-accent text-accent-foreground"
+                            )
+                          }
+                        >
+                          Dashboard
+                        </NavLink>
+                        <NavLink
+                          to="/product-sales"
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center py-2 px-3 rounded-md hover:bg-accent",
+                              isActive && "bg-accent text-accent-foreground"
+                            )
+                          }
+                        >
+                          Product Sales
+                        </NavLink>
+                        <NavLink
+                          to="/canteen"
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center py-2 px-3 rounded-md hover:bg-accent",
+                              isActive && "bg-accent text-accent-foreground"
+                            )
+                          }
+                        >
+                          Canteen
+                        </NavLink>
+                        <NavLink
+                          to="/products"
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center py-2 px-3 rounded-md hover:bg-accent",
+                              isActive && "bg-accent text-accent-foreground"
+                            )
+                          }
+                        >
+                          Products
+                        </NavLink>
+                        <NavLink
+                          to="/users"
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center py-2 px-3 rounded-md hover:bg-accent",
+                              isActive && "bg-accent text-accent-foreground"
+                            )
+                          }
+                        >
+                          Users
+                        </NavLink>
+                        <NavLink
+                          to="/transactions"
+                          className={({ isActive }) =>
+                            cn(
+                              "flex items-center py-2 px-3 rounded-md hover:bg-accent",
+                              isActive && "bg-accent text-accent-foreground"
+                            )
+                          }
+                        >
+                          Transactions
+                        </NavLink>
+                      </div>
+                    </SheetContent>
+                  </Sheet>
                 </div>
               )}
-              <div className="ml-auto flex gap-2 items-center">
+
+              <div className="flex items-center gap-2">
                 <Button
                   variant="destructive"
                   onClick={() => {
@@ -315,7 +474,7 @@ function Screensaver() {
     "  _____",
     " /     \\",
     "|  o o  |",
-    "|       ᴥ  |",
+    "|         ᴥ  |",
     " \\_____/",
     "",
     "   ____",

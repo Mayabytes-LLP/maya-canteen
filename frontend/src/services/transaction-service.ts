@@ -9,7 +9,7 @@ export interface Transaction {
   user_name: string;
   amount: number;
   description: string;
-  transaction_type: string;
+  transaction_type: "deposit" | "purchase";
   created_at: string;
   updated_at: string;
   products?: TransactionProduct[];
@@ -172,6 +172,7 @@ export const transactionService = {
 
     const res = await response.json();
 
+    console.log(res.data);
     return res.data;
   },
 

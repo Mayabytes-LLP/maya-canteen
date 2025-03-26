@@ -1,10 +1,3 @@
-import { zodResolver } from "@hookform/resolvers/zod";
-import { addDays, format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -21,13 +14,19 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { toast } from "sonner";
-import { useState } from "react";
-
+import { cn } from "@/lib/utils";
 import {
   Transaction,
   transactionService,
 } from "@/services/transaction-service";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { addDays, format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { useState } from "react";
+import { DateRange } from "react-day-picker";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
 const FormSchema = z.object({
   data_range: z
@@ -83,9 +82,13 @@ export default function DateRangeFilter({
     setLoading(true);
 
     try {
+      // Format dates to YYYY-MM-DD format as expected by the backend
+      const formattedStartDate = format(data.data_range.from, "yyyy-MM-dd");
+      const formattedEndDate = format(data.data_range.to, "yyyy-MM-dd");
+
       const transactions = await transactionService.getTransactionsByDateRange({
-        startDate: data.data_range.from.toISOString(),
-        endDate: data.data_range.to.toISOString(),
+        startDate: formattedStartDate,
+        endDate: formattedEndDate,
       });
       onTransactionsLoaded(transactions);
       toast.success("Transactions filtered successfully");
@@ -113,7 +116,7 @@ export default function DateRangeFilter({
                       variant={"outline"}
                       className={cn(
                         "w-[240px] pl-3 text-left font-normal",
-                        !field.value && "text-muted-foreground",
+                        !field.value && "text-muted-foreground"
                       )}
                     >
                       {field.value.from ? (
@@ -136,7 +139,7 @@ export default function DateRangeFilter({
                   <Calendar
                     mode="range"
                     defaultMonth={field.value.from || new Date()}
-                    selected={{ from: field.value.from!, to: field.value.to }}
+                    selected={field.value as DateRange}
                     onSelect={field.onChange}
                     disabled={(date) => date < new Date("2025-03-01")}
                     numberOfMonths={2}
@@ -145,7 +148,7 @@ export default function DateRangeFilter({
                 </PopoverContent>
               </Popover>
               <FormDescription>
-                Your date of birth is used to calculate your age.
+                Filter transactions between selected dates.
               </FormDescription>
               <FormMessage />
             </FormItem>

@@ -82,11 +82,13 @@ export default function DepositForm({
   onTransactionAdded,
 }: TransactionFormProps) {
   const [users, setUsers] = useState<User[]>([]);
+  const [allUsers, setAllUsers] = useState<User[]>([]); // Store all users
   const [products, setProducts] = useState<Product[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [totalAmount, setTotalAmount] = useState<number>(0);
   const [isSingleUnit, setIsSingleUnit] = useState<boolean>(false);
+  const [showInactiveUsers, setShowInactiveUsers] = useState<boolean>(false);
 
   const [userPopover, setUserPopover] = useState<boolean>(false);
   const [productPopover, setProductPopover] = useState<boolean>(false);
@@ -116,7 +118,10 @@ export default function DepositForm({
           transactionService.getAllUsers(),
           transactionService.getAllProducts(),
         ]);
-        setUsers(usersData ?? []);
+
+        setAllUsers(usersData ?? []); // Store all users
+        // Initially only show active users
+        setUsers((usersData ?? []).filter((user) => user.active));
         setProducts(productsData ?? []);
       } catch (error) {
         toast.error("Failed to load data");
@@ -135,6 +140,17 @@ export default function DepositForm({
     );
     setTotalAmount(total);
   }, [cartItems]);
+
+  // Filter users based on showInactiveUsers toggle
+  useEffect(() => {
+    if (allUsers.length > 0) {
+      if (showInactiveUsers) {
+        setUsers(allUsers);
+      } else {
+        setUsers(allUsers.filter((user) => user.active));
+      }
+    }
+  }, [showInactiveUsers, allUsers]);
 
   // Handle adding product to cart
   const handleAddToCart = () => {
@@ -323,7 +339,24 @@ export default function DepositForm({
               name="user_id"
               render={({ field }) => (
                 <FormItem className="flex flex-col items-stretch">
-                  <FormLabel>Employee</FormLabel>
+                  <div className="flex justify-between items-center">
+                    <FormLabel>Employee</FormLabel>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="show-inactive"
+                        checked={showInactiveUsers}
+                        onCheckedChange={(checked) =>
+                          setShowInactiveUsers(checked === true)
+                        }
+                      />
+                      <label
+                        htmlFor="show-inactive"
+                        className="text-sm cursor-pointer"
+                      >
+                        Show inactive users
+                      </label>
+                    </div>
+                  </div>
                   <Popover open={userPopover} onOpenChange={setUserPopover}>
                     <PopoverTrigger asChild>
                       <FormControl>

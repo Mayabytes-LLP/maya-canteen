@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn, formatDate, formatPrice } from "@/lib/utils";
+import { cn, formatDate, formatTransaction } from "@/lib/utils";
 import {
   ProductSalesSummary,
   TransactionProductDetail,
@@ -29,11 +29,10 @@ import { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 
 export default function ProductSalesPage() {
-  const [date, setDate] = useState<DateRange | undefined>({
+  const [date, setDate] = useState<DateRange>({
     from: new Date(new Date().setDate(new Date().getDate() - 30)),
     to: new Date(),
   });
-
   const [loading, setLoading] = useState(false);
   const [productSummary, setProductSummary] = useState<ProductSalesSummary[]>(
     []
@@ -43,7 +42,9 @@ export default function ProductSalesPage() {
   >([]);
 
   const handleDateSelect = (range: DateRange | undefined) => {
-    setDate(range);
+    if (range) {
+      setDate(range);
+    }
   };
 
   const handleGenerateReport = async () => {
@@ -54,7 +55,7 @@ export default function ProductSalesPage() {
 
     setLoading(true);
     try {
-      // Format dates for API request (YYYY-MM-DD)
+      // Format dates to YYYY-MM-DD format as expected by backend
       const dateRange = {
         startDate: format(date.from, "yyyy-MM-dd"),
         endDate: format(date.to, "yyyy-MM-dd"),
@@ -71,7 +72,6 @@ export default function ProductSalesPage() {
         dateRange
       );
       setProductDetails(details);
-
       toast.success("Report generated successfully");
     } catch (error) {
       console.error("Error generating report:", error);
@@ -232,7 +232,7 @@ export default function ProductSalesPage() {
                           <TableCell>{item.full_unit_sold}</TableCell>
                           <TableCell>{item.single_unit_sold}</TableCell>
                           <TableCell className="text-right">
-                            {formatPrice(item.total_sales)}
+                            {formatTransaction(item.total_sales)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -299,12 +299,14 @@ export default function ProductSalesPage() {
                             <Badge variant="outline">{item.product_type}</Badge>
                           </TableCell>
                           <TableCell>{item.quantity}</TableCell>
-                          <TableCell>{formatPrice(item.unit_price)}</TableCell>
+                          <TableCell>
+                            {formatTransaction(item.unit_price)}
+                          </TableCell>
                           <TableCell>
                             {item.is_single_unit ? "Single" : "Full"}
                           </TableCell>
                           <TableCell className="text-right">
-                            {formatPrice(item.total_price)}
+                            {formatTransaction(item.total_price)}
                           </TableCell>
                           <TableCell>{formatDate(item.created_at)}</TableCell>
                         </TableRow>

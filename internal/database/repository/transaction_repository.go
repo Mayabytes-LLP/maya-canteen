@@ -304,6 +304,7 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
           users.employee_id, 
           users.department, 
           users.phone,
+          users.active,
           COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
         FROM users
         LEFT JOIN transactions ON users.id = transactions.user_id
@@ -326,6 +327,7 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 			&balance.EmployeeID,
 			&balance.Department,
 			&balance.Phone,
+			&balance.UserActive,
 			&balance.Balance,
 		)
 		if err != nil {
@@ -345,6 +347,7 @@ func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBal
       users.employee_id, 
       users.department, 
       users.phone,
+      users.active,
 		  COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
 		FROM users
 		LEFT JOIN transactions ON users.id = transactions.user_id
@@ -358,6 +361,7 @@ func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBal
 		&balance.EmployeeID,
 		&balance.Department,
 		&balance.Phone,
+		&balance.UserActive,
 		&balance.Balance,
 	)
 	if err != nil {

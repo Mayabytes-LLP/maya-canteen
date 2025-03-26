@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AppContext } from "@/context";
-import { formatDate, formatPrice } from "@/lib/utils";
+import { formatDate, formatTransaction } from "@/lib/utils";
 import {
   Transaction,
   transactionService,
@@ -66,7 +66,7 @@ export default function TransactionList({
   );
   const [editAmount, setEditAmount] = useState("");
   const [editDescription, setEditDescription] = useState("");
-  const [editType, setEditType] = useState("");
+  const [editType, setEditType] = useState<"purchase" | "deposit">("purchase");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
@@ -126,11 +126,6 @@ export default function TransactionList({
   const getUserName = (userId: number): string => {
     const user = users.find((u) => u.id === userId);
     return user ? user.name : "Unknown User";
-  };
-
-  // Format transaction amount with currency symbol
-  const formatAmount = (amount: number, type: string): string => {
-    return `${type === "deposit" ? "+" : "-"}${formatPrice(amount)}`;
   };
 
   // View transaction details
@@ -264,7 +259,7 @@ export default function TransactionList({
                         : "text-red-600"
                     }`}
                   >
-                    {formatAmount(
+                    {formatTransaction(
                       transaction.amount,
                       transaction.transaction_type
                     )}
@@ -333,7 +328,7 @@ export default function TransactionList({
                         : "text-red-600"
                     }
                   >
-                    {formatAmount(
+                    {formatTransaction(
                       selectedTransaction.amount,
                       selectedTransaction.transaction_type
                     )}
@@ -417,7 +412,12 @@ export default function TransactionList({
                 <Label htmlFor="transaction_type" className="w-[120px]">
                   Type
                 </Label>
-                <Select value={editType} onValueChange={setEditType}>
+                <Select
+                  value={editType}
+                  onValueChange={(value) =>
+                    setEditType(value as "purchase" | "deposit")
+                  }
+                >
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>

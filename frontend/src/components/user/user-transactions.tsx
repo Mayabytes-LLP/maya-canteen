@@ -13,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { formatTransaction } from "@/lib/utils";
 import {
   Transaction,
   User,
@@ -56,11 +57,6 @@ export default function UserTransactions({
 
     fetchData();
   }, [userId]);
-
-  // Format transaction amount with currency symbol
-  const formatAmount = (amount: number, type: string): string => {
-    return `${type === "deposit" ? "+" : "-"}PKR.${amount.toFixed(2)}`;
-  };
 
   // Calculate balance
   const calculateBalance = (): number => {
@@ -163,9 +159,9 @@ export default function UserTransactions({
                           : "text-red-600"
                       }`}
                     >
-                      {formatAmount(
+                      {formatTransaction(
                         transaction.amount,
-                        transaction.transaction_type,
+                        transaction.transaction_type
                       )}
                     </div>
                   </div>
@@ -202,9 +198,9 @@ export default function UserTransactions({
                         : "text-red-600"
                     }
                   >
-                    {formatAmount(
+                    {formatTransaction(
                       selectedTransaction.amount,
-                      selectedTransaction.transaction_type,
+                      selectedTransaction.transaction_type
                     )}
                   </p>
                 </div>

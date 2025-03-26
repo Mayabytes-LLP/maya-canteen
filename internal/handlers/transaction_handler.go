@@ -265,6 +265,7 @@ type DateRangeRequest struct {
 func (h *TransactionHandler) GetTransactionsByDateRange(w http.ResponseWriter, r *http.Request) {
 	var dateRange DateRangeRequest
 	if err := h.DecodeJSON(r, &dateRange); err != nil {
+		log.Errorf("Error decoding JSON: %v", err)
 		h.HandleError(w, err)
 		return
 	}

@@ -6,6 +6,7 @@ type UserBalance struct {
 	UserName   string  `json:"user_name"`
 	EmployeeID string  `json:"employee_id"`
 	Department string  `json:"user_department"`
+	UserActive bool    `json:"user_active"`
 	Phone      string  `json:"user_phone"`
 	Balance    float64 `json:"balance"`
 }

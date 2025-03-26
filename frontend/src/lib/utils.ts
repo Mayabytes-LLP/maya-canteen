@@ -5,11 +5,18 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const formatPrice = (price: number): string => {
-  return new Intl.NumberFormat("ur-pk", {
+export const formatTransaction = (
+  amount: number,
+  type?: "deposit" | "purchase"
+): string => {
+  const formattedAmount = new Intl.NumberFormat("ur-pk", {
     style: "currency",
     currency: "PKR",
-  }).format(price);
+  }).format(amount);
+
+  return type
+    ? `${type === "deposit" ? "+" : "-"}${formattedAmount}`
+    : formattedAmount;
 };
 
 export const formatDate = (dateString: string): string => {
