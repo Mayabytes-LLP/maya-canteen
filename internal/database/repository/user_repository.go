@@ -23,6 +23,7 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 func (r *UserRepository) InitTable() error {
 	// First check if the active column exists, if not, add it
 	r.addActiveColumnIfNeeded()
+	r.addLastNotificationColumnIfNeeded()
 
 	query := `
 		CREATE TABLE IF NOT EXISTS users (
@@ -32,6 +33,7 @@ func (r *UserRepository) InitTable() error {
 			employee_id TEXT NOT NULL UNIQUE,
 			phone TEXT,
 			active BOOLEAN NOT NULL DEFAULT 1,
+      last_notification DATETIME,
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL
 		)
@@ -100,16 +102,48 @@ func (r *UserRepository) addActiveColumnIfNeeded() {
 	}
 }
 
+func (r *UserRepository) addLastNotificationColumnIfNeeded() {
+	var colExists bool
+	err := r.db.QueryRow(`
+    SELECT COUNT(*) > 0
+    FROM pragma_table_info('users')
+    WHERE name = 'last_notification'
+  `).Scan(&colExists)
+
+	if err != nil || colExists {
+		if err != nil {
+			log.Errorf("Error checking if last_notification column exists: %v", err)
+		}
+		log.Info("last_notification column already exists in users table")
+		return
+	}
+
+	_, err = r.db.Exec(`ALTER TABLE users ADD COLUMN last_notification DATETIME DEFAULT NULL`)
+	if err != nil {
+		log.Errorf("Error adding last_notification column to users table: %v", err)
+	} else {
+		log.Info("Added last_notification column to users table")
+	}
+}
+
 // Create inserts a new user into the database
 func (r *UserRepository) Create(user *models.User) error {
 	query := `
-		INSERT INTO users (name, employee_id, department, phone, active, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO users (name, employee_id, department, phone, active, last_notification, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	// If Active field is not explicitly set, default to true (active)
 	if !user.Active {
 		user.Active = true
+	}
+
+	// LastNotification can be NULL, so handle it accordingly
+	var lastNotification any
+	if user.LastNotification != nil {
+		lastNotification = *user.LastNotification
+	} else {
+		lastNotification = nil
 	}
 
 	result, err := r.db.Exec(
@@ -119,6 +153,7 @@ func (r *UserRepository) Create(user *models.User) error {
 		user.Department,
 		user.Phone,
 		user.Active,
+		lastNotification,
 		now,
 		now,
 	)
@@ -139,7 +174,7 @@ func (r *UserRepository) Create(user *models.User) error {
 
 // GetAll retrieves all users from the database
 func (r *UserRepository) GetAll() ([]models.User, error) {
-	query := `SELECT id, name, employee_id, department, phone, active, created_at, updated_at FROM users ORDER BY name ASC`
+	query := `SELECT id, name, employee_id, department, phone, active, last_notification, created_at, updated_at FROM users ORDER BY name ASC`
 	rows, err := r.db.Query(query)
 	if err != nil {
 		log.Errorf("Error getting all users: %v", err)
@@ -150,6 +185,8 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
+		var lastNotificationNull sql.NullTime
+
 		err := rows.Scan(
 			&user.ID,
 			&user.Name,
@@ -157,6 +194,7 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 			&user.Department,
 			&user.Phone,
 			&user.Active,
+			&lastNotificationNull,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -164,6 +202,11 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 			log.Errorf("Error scanning user row: %v", err)
 			return nil, err
 		}
+
+		if lastNotificationNull.Valid {
+			user.LastNotification = &lastNotificationNull.Time
+		}
+
 		users = append(users, user)
 	}
 	return users, nil
@@ -172,8 +215,11 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 // Get retrieves a single user by ID
 func (r *UserRepository) Get(id int64) (*models.User, error) {
 	fmt.Println("Get user by ID", id)
-	query := `SELECT id, name, employee_id, department, phone, active, created_at, updated_at FROM users WHERE employee_id = ?`
+	query := `SELECT id, name, employee_id, department, phone, active, last_notification, created_at, updated_at FROM users WHERE employee_id = ?`
+
 	var user models.User
+	var lastNotificationNull sql.NullTime
+
 	err := r.db.QueryRow(query, id).Scan(
 		&user.ID,
 		&user.Name,
@@ -181,9 +227,11 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 		&user.Department,
 		&user.Phone,
 		&user.Active,
+		&lastNotificationNull,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
+
 	if err == sql.ErrNoRows {
 		log.Errorf("No user found with ID %d", id)
 		return nil, nil
@@ -192,13 +240,21 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 		log.Errorf("Error in getting user by ID: %v", err)
 		return nil, err
 	}
+
+	if lastNotificationNull.Valid {
+		user.LastNotification = &lastNotificationNull.Time
+	}
+
 	return &user, nil
 }
 
 // GetByEmployeeID retrieves a single user by employee ID
 func (r *UserRepository) GetByEmployeeID(employeeID string) (*models.User, error) {
-	query := `SELECT id, name, employee_id, department, phone, active, created_at, updated_at FROM users WHERE employee_id = ?`
+	query := `SELECT id, name, employee_id, department, phone, active, last_notification, created_at, updated_at FROM users WHERE employee_id = ?`
+
 	var user models.User
+	var lastNotificationNull sql.NullTime
+
 	err := r.db.QueryRow(query, employeeID).Scan(
 		&user.ID,
 		&user.Name,
@@ -206,9 +262,11 @@ func (r *UserRepository) GetByEmployeeID(employeeID string) (*models.User, error
 		&user.Department,
 		&user.Phone,
 		&user.Active,
+		&lastNotificationNull,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
+
 	if err == sql.ErrNoRows {
 		log.Errorf("No user found with employee ID %s", employeeID)
 		return nil, nil
@@ -217,6 +275,11 @@ func (r *UserRepository) GetByEmployeeID(employeeID string) (*models.User, error
 		log.Errorf("Error in getting user by employee ID: %v", err)
 		return nil, err
 	}
+
+	if lastNotificationNull.Valid {
+		user.LastNotification = &lastNotificationNull.Time
+	}
+
 	return &user, nil
 }
 
@@ -251,5 +314,14 @@ func (r *UserRepository) Update(user *models.User) error {
 func (r *UserRepository) Delete(id int64) error {
 	query := `DELETE FROM users WHERE id = ?`
 	_, err := r.db.Exec(query, id)
+	return err
+}
+
+func (r *UserRepository) UpdateLastNotificationTime(employeeID string) error {
+	query := `UPDATE users SET last_notification = ? WHERE employee_id = ?`
+	_, err := r.db.Exec(query, time.Now(), employeeID)
+	if err != nil {
+		log.Errorf("Error updating last notification time for user: %v", err)
+	}
 	return err
 }

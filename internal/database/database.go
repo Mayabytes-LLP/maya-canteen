@@ -37,6 +37,7 @@ type Service interface {
 	GetUser(id int64) (*models.User, error)
 	UpdateUser(user *models.User) error
 	DeleteUser(id int64) error
+	UpdateLastNotificationTime(id string) error
 
 	// Transaction-related operations
 	InitTransactionTable() error
@@ -224,6 +225,10 @@ func (s *service) UpdateUser(user *models.User) error {
 
 func (s *service) DeleteUser(id int64) error {
 	return s.userRepository.Delete(id)
+}
+
+func (s *service) UpdateLastNotificationTime(id string) error {
+	return s.userRepository.UpdateLastNotificationTime(id)
 }
 
 // Transaction-related operations

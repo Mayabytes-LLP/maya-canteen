@@ -37,14 +37,14 @@ func (p *Product) SetID(id int64) {
 }
 
 // SetCreatedAt sets the created timestamp
-func (p *Product) SetCreatedAt(timestamp interface{}) {
+func (p *Product) SetCreatedAt(timestamp any) {
 	if t, ok := timestamp.(time.Time); ok {
 		p.CreatedAt = t
 	}
 }
 
 // SetUpdatedAt sets the updated timestamp
-func (p *Product) SetUpdatedAt(timestamp interface{}) {
+func (p *Product) SetUpdatedAt(timestamp any) {
 	if t, ok := timestamp.(time.Time); ok {
 		p.UpdatedAt = t
 	}

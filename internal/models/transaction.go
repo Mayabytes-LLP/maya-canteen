@@ -40,14 +40,14 @@ func (t *Transaction) SetID(id int64) {
 }
 
 // SetCreatedAt sets the created timestamp
-func (t *Transaction) SetCreatedAt(timestamp interface{}) {
+func (t *Transaction) SetCreatedAt(timestamp any) {
 	if ts, ok := timestamp.(time.Time); ok {
 		t.CreatedAt = ts
 	}
 }
 
 // SetUpdatedAt sets the updated timestamp
-func (t *Transaction) SetUpdatedAt(timestamp interface{}) {
+func (t *Transaction) SetUpdatedAt(timestamp any) {
 	if ts, ok := timestamp.(time.Time); ok {
 		t.UpdatedAt = ts
 	}

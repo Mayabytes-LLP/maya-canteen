@@ -20,6 +20,7 @@ type UserRepositoryInterface interface {
 	Get(id int64) (*models.User, error)
 	Update(user *models.User) error
 	Delete(id int64) error
+	UpdateLastNotificationTime(id string) error
 }
 
 // TransactionRepositoryInterface defines operations for transaction data

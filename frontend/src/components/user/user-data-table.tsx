@@ -158,6 +158,11 @@ export function BalanceTable({
         const balance = row.original;
         return (
           <div className="flex items-center space-x-1">
+            <span className="text-xs text-muted-foreground">
+              {balance.last_notification
+                ? `Last notification: ${balance.last_notification}`
+                : "No notification sent"}
+            </span>
             <Button
               variant="ghost"
               size="sm"

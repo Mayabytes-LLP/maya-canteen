@@ -45,11 +45,11 @@ func (r *TransactionRepository) InitTable() error {
 func (r *TransactionRepository) Create(transaction *models.Transaction) error {
 	query := `
 		INSERT INTO transactions (
-      user_id, 
-      amount, 
-      description, 
-      transaction_type, 
-      created_at, 
+      user_id,
+      amount,
+      description,
+      transaction_type,
+      created_at,
       updated_at
     )
 		VALUES (
@@ -114,8 +114,8 @@ func (r *TransactionRepository) GetAll() ([]models.Transaction, error) {
 // Get retrieves a single transaction by ID
 func (r *TransactionRepository) Get(id int64) (*models.Transaction, error) {
 	query := `
-    SELECT * 
-    FROM transactions 
+    SELECT *
+    FROM transactions
     WHERE id = ?
   `
 	var transaction models.Transaction
@@ -298,29 +298,30 @@ func (r *TransactionRepository) GetLatest(limit int) ([]models.Transaction, erro
 // GetUsersBalances retrieves the total balance for each user
 func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error) {
 	query := `
-        SELECT 
+        SELECT
           users.id,
-          users.name, 
-          users.employee_id, 
-          users.department, 
+          users.name,
+          users.employee_id,
+          users.department,
           users.phone,
           users.active,
+          users.last_notification,
           COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
         FROM users
         LEFT JOIN transactions ON users.id = transactions.user_id
         GROUP BY users.id
     `
-
 	rows, err := r.db.Query(query)
 	if err != nil {
 		log.Errorf("Error executing query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
-
 	var balances []models.UserBalance
 	for rows.Next() {
 		var balance models.UserBalance
+		var lastNotificationNull sql.NullTime
+
 		err := rows.Scan(
 			&balance.UserID,
 			&balance.UserName,
@@ -328,12 +329,19 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 			&balance.Department,
 			&balance.Phone,
 			&balance.UserActive,
+			&lastNotificationNull,
 			&balance.Balance,
 		)
 		if err != nil {
 			log.Errorf("Error scanning row: %v", err)
 			return nil, err
 		}
+
+		if lastNotificationNull.Valid {
+			lastNotification := lastNotificationNull.Time
+			balance.LastNotification = &lastNotification
+		}
+
 		balances = append(balances, balance)
 	}
 	return balances, nil
@@ -341,13 +349,14 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 
 func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBalance, error) {
 	query := `
-		SELECT 
-      users.id, 
-      users.name, 
-      users.employee_id, 
-      users.department, 
+		SELECT
+      users.id,
+      users.name,
+      users.employee_id,
+      users.department,
       users.phone,
       users.active,
+      last_notification,
 		  COALESCE(SUM(CASE WHEN transactions.transaction_type = 'deposit' THEN transactions.amount ELSE -transactions.amount END), 0) AS balance
 		FROM users
 		LEFT JOIN transactions ON users.id = transactions.user_id
@@ -355,6 +364,8 @@ func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBal
 		GROUP BY users.id
 	`
 	var balance models.UserBalance
+	var lastNotificationNull sql.NullTime
+
 	err := r.db.QueryRow(query, userID).Scan(
 		&balance.UserID,
 		&balance.UserName,
@@ -362,11 +373,18 @@ func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBal
 		&balance.Department,
 		&balance.Phone,
 		&balance.UserActive,
+		&lastNotificationNull,
 		&balance.Balance,
 	)
 	if err != nil {
 		log.Errorf("Error scanning row: %v", err)
 		return models.UserBalance{}, err
 	}
+
+	if lastNotificationNull.Valid {
+		lastNotification := lastNotificationNull.Time
+		balance.LastNotification = &lastNotification
+	}
+
 	return balance, nil
 }

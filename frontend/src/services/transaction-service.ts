@@ -63,6 +63,7 @@ export interface User {
   department: string;
   phone: string;
   active: boolean;
+  last_notification: string;
   created_at: string;
   updated_at: string;
 }
@@ -92,6 +93,7 @@ export interface UserBalance {
   user_department: string;
   user_phone: string;
   user_active: boolean;
+  last_notification: string;
   balance: number;
 }
 

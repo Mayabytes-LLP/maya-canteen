@@ -101,7 +101,6 @@ func ServeStaticFiles(handler http.Handler) http.Handler {
 
 		// For other routes, serve index.html (SPA routing)
 		var indexHTML []byte
-		var err error
 
 		if _, err := os.Stat("./dist"); err == nil {
 			// Development: read from disk
@@ -120,11 +119,6 @@ func ServeStaticFiles(handler http.Handler) http.Handler {
 					return
 				}
 			}
-		}
-
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
 		}
 
 		w.Header().Set("Content-Type", "text/html")

@@ -35,7 +35,7 @@ export default function ProductSalesPage() {
   });
   const [loading, setLoading] = useState(false);
   const [productSummary, setProductSummary] = useState<ProductSalesSummary[]>(
-    []
+    [],
   );
   const [productDetails, setProductDetails] = useState<
     TransactionProductDetail[]
@@ -62,16 +62,18 @@ export default function ProductSalesPage() {
       };
 
       // Get product sales summary
-      const summary = await transactionService.getProductSalesSummary(
-        dateRange
-      );
-      setProductSummary(summary);
+      const summary =
+        await transactionService.getProductSalesSummary(dateRange);
+      setProductSummary(summary ?? []);
 
       // Get product transaction details
-      const details = await transactionService.getTransactionProductDetails(
-        dateRange
-      );
-      setProductDetails(details);
+      const details =
+        await transactionService.getTransactionProductDetails(dateRange);
+      setProductDetails(details ?? []);
+      if (!summary || !details) {
+        toast.error("No data available for the selected date range");
+        return;
+      }
       toast.success("Report generated successfully");
     } catch (error) {
       console.error("Error generating report:", error);
@@ -140,7 +142,7 @@ export default function ProductSalesPage() {
                         variant={"outline"}
                         className={cn(
                           "w-full justify-start text-left font-normal",
-                          !date && "text-muted-foreground"
+                          !date && "text-muted-foreground",
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
@@ -160,7 +162,7 @@ export default function ProductSalesPage() {
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
                       <Calendar
-                        initialFocus
+                        autoFocus
                         mode="range"
                         defaultMonth={date?.from}
                         selected={date}
@@ -194,8 +196,8 @@ export default function ProductSalesPage() {
                       productSummary,
                       `product-sales-summary-${format(
                         new Date(),
-                        "yyyy-MM-dd"
-                      )}.csv`
+                        "yyyy-MM-dd",
+                      )}.csv`,
                     )
                   }
                   disabled={!productSummary.length}
@@ -261,8 +263,8 @@ export default function ProductSalesPage() {
                       productDetails,
                       `product-sales-details-${format(
                         new Date(),
-                        "yyyy-MM-dd"
-                      )}.csv`
+                        "yyyy-MM-dd",
+                      )}.csv`,
                     )
                   }
                   disabled={!productDetails.length}
