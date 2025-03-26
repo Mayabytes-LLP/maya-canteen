@@ -59,13 +59,22 @@ jobs:
         run: |
           # Install rcedit tool to modify Windows executables
           choco install rcedit -y
+
+          # Install ImageMagick to convert PNG to ICO
+          choco install imagemagick -y
+
+          # Convert PNG to ICO format
+          $iconPath = "app_icon.ico"
+          magick "frontend/public/mayabytes-favicon-270x270.png" -define icon:auto-resize=64,48,32,16 $iconPath
+
           # Build the application without icon first
           $env:CGO_ENABLED=1
           $env:GOOS="windows"
           $env:GOARCH="amd64"
           go build -o ${{ matrix.output_name }} cmd/api/main.go
+
           # Use rcedit to add icon
-          rcedit "${{ matrix.output_name }}" --set-icon "frontend/public/mayabytes-favicon-270x270.png"
+          rcedit "${{ matrix.output_name }}" --set-icon $iconPath
 
       - name: Build Backend for Linux/macOS
         if: matrix.os != 'windows-latest'
