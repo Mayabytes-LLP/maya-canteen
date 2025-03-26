@@ -37,7 +37,7 @@ export const queryKeys = {
 
 // Transaction queries
 export const useAllTransactions = (
-  options?: UseQueryOptions<Transaction[]>
+  options?: UseQueryOptions<Transaction[]>,
 ) => {
   return useQuery({
     queryKey: queryKeys.transactions,
@@ -48,7 +48,7 @@ export const useAllTransactions = (
 
 export const useLatestTransactions = (
   limit: number = 10,
-  options?: UseQueryOptions<Transaction[]>
+  options?: UseQueryOptions<Transaction[]>,
 ) => {
   return useQuery({
     queryKey: queryKeys.latestTransactions(limit),
@@ -59,7 +59,7 @@ export const useLatestTransactions = (
 
 export const useTransaction = (
   id: number,
-  options?: UseQueryOptions<Transaction>
+  options?: UseQueryOptions<Transaction>,
 ) => {
   return useQuery({
     queryKey: queryKeys.transaction(id),
@@ -71,7 +71,7 @@ export const useTransaction = (
 
 export const useTransactionsByDateRange = (
   dateRange: DateRangeRequest,
-  options?: UseQueryOptions<Transaction[]>
+  options?: UseQueryOptions<Transaction[]>,
 ) => {
   return useQuery({
     queryKey: queryKeys.transactionsByDateRange(dateRange),
@@ -84,7 +84,7 @@ export const useTransactionsByDateRange = (
 export const useTransactionsByUser = (
   userId: string,
   limit: number = 10,
-  options?: UseQueryOptions<Transaction[]>
+  options?: UseQueryOptions<Transaction[]>,
 ) => {
   return useQuery({
     queryKey: queryKeys.transactionsByUser(userId, limit),
@@ -138,7 +138,7 @@ export const useCreateTransaction = () => {
       transaction: Omit<
         Transaction,
         "id" | "user_name" | "created_at" | "updated_at"
-      >
+      >,
     ) => transactionService.createTransaction(transaction),
     onSuccess: () => {
       // Invalidate and refetch transactions lists
@@ -212,7 +212,10 @@ export const useUpdateUser = () => {
 
   return useMutation({
     mutationFn: (
-      user: Pick<User, "id" | "name" | "employee_id" | "department" | "phone">
+      user: Pick<
+        User,
+        "id" | "name" | "employee_id" | "department" | "phone" | "active"
+      >,
     ) => transactionService.updateUser(user),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users });

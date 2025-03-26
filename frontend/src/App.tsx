@@ -1,25 +1,34 @@
-import { ModeToggle } from "@/components/mode-toggle";
+import { useForm } from "react-hook-form";
+import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router";
+import { toast } from "sonner";
+import { z } from "zod";
+
 import { AppContext } from "@/context";
+
 import CanteenPage from "@/pages/canteen-page";
 import ProductPage from "@/pages/product-page";
+import DashboardPage from "@/pages/dashboard-page";
+import TransactionsPage from "@/pages/transactions-page";
 import ProductSalesPage from "@/pages/product-sales-page";
 import UserPage from "@/pages/user-page";
+
 import { Menu } from "lucide-react";
 import { useContext, useEffect, useState } from "react";
+
 import {
   NavigationMenu,
   NavigationMenuItem,
   NavigationMenuList,
   navigationMenuTriggerStyle,
-} from "./components/ui/navigation-menu";
+} from "@/components/ui/navigation-menu";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from "./components/ui/sheet";
-
+} from "@/components/ui/sheet";
+import { ModeToggle } from "@/components/mode-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -32,15 +41,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import DashboardPage from "@/pages/dashboard-page";
 import { transactionService } from "@/services/transaction-service";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router";
-import { toast } from "sonner";
-import { z } from "zod";
-import TransactionsPage from "./pages/transactions-page";
-
 // Form validation schema
 const formSchema = z.object({
   employee_id: z.string().min(2, "Employee ID must be at least 2 characters"),
@@ -110,7 +112,7 @@ function App() {
       <div
         className={cn(
           "fixed bottom-0 left-0 w-full h-1 z-50",
-          zkDeviceStatus ? "bg-green-500" : "bg-pink-700"
+          zkDeviceStatus ? "bg-green-500" : "bg-pink-700",
         )}
       ></div>
       {currentUser && (
@@ -131,7 +133,7 @@ function App() {
                             className={({ isActive }) =>
                               cn(
                                 navigationMenuTriggerStyle(),
-                                isActive && "bg-accent text-accent-foreground"
+                                isActive && "bg-accent text-accent-foreground",
                               )
                             }
                           >
@@ -144,7 +146,7 @@ function App() {
                             className={({ isActive }) =>
                               cn(
                                 navigationMenuTriggerStyle(),
-                                isActive && "bg-accent text-accent-foreground"
+                                isActive && "bg-accent text-accent-foreground",
                               )
                             }
                           >
@@ -157,7 +159,7 @@ function App() {
                             className={({ isActive }) =>
                               cn(
                                 navigationMenuTriggerStyle(),
-                                isActive && "bg-accent text-accent-foreground"
+                                isActive && "bg-accent text-accent-foreground",
                               )
                             }
                           >
@@ -170,7 +172,7 @@ function App() {
                             className={({ isActive }) =>
                               cn(
                                 navigationMenuTriggerStyle(),
-                                isActive && "bg-accent text-accent-foreground"
+                                isActive && "bg-accent text-accent-foreground",
                               )
                             }
                           >
@@ -183,7 +185,7 @@ function App() {
                             className={({ isActive }) =>
                               cn(
                                 navigationMenuTriggerStyle(),
-                                isActive && "bg-accent text-accent-foreground"
+                                isActive && "bg-accent text-accent-foreground",
                               )
                             }
                           >
@@ -196,7 +198,7 @@ function App() {
                             className={({ isActive }) =>
                               cn(
                                 navigationMenuTriggerStyle(),
-                                isActive && "bg-accent text-accent-foreground"
+                                isActive && "bg-accent text-accent-foreground",
                               )
                             }
                           >
@@ -233,7 +235,7 @@ function App() {
                           className={({ isActive }) =>
                             cn(
                               "flex items-center py-2 px-3 rounded-md hover:bg-accent",
-                              isActive && "bg-accent text-accent-foreground"
+                              isActive && "bg-accent text-accent-foreground",
                             )
                           }
                         >
@@ -244,7 +246,7 @@ function App() {
                           className={({ isActive }) =>
                             cn(
                               "flex items-center py-2 px-3 rounded-md hover:bg-accent",
-                              isActive && "bg-accent text-accent-foreground"
+                              isActive && "bg-accent text-accent-foreground",
                             )
                           }
                         >
@@ -255,7 +257,7 @@ function App() {
                           className={({ isActive }) =>
                             cn(
                               "flex items-center py-2 px-3 rounded-md hover:bg-accent",
-                              isActive && "bg-accent text-accent-foreground"
+                              isActive && "bg-accent text-accent-foreground",
                             )
                           }
                         >
@@ -266,7 +268,7 @@ function App() {
                           className={({ isActive }) =>
                             cn(
                               "flex items-center py-2 px-3 rounded-md hover:bg-accent",
-                              isActive && "bg-accent text-accent-foreground"
+                              isActive && "bg-accent text-accent-foreground",
                             )
                           }
                         >
@@ -277,7 +279,7 @@ function App() {
                           className={({ isActive }) =>
                             cn(
                               "flex items-center py-2 px-3 rounded-md hover:bg-accent",
-                              isActive && "bg-accent text-accent-foreground"
+                              isActive && "bg-accent text-accent-foreground",
                             )
                           }
                         >
@@ -288,7 +290,7 @@ function App() {
                           className={({ isActive }) =>
                             cn(
                               "flex items-center py-2 px-3 rounded-md hover:bg-accent",
-                              isActive && "bg-accent text-accent-foreground"
+                              isActive && "bg-accent text-accent-foreground",
                             )
                           }
                         >

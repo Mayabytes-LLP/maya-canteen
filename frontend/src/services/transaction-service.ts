@@ -164,7 +164,7 @@ export const transactionService = {
 
   async getLatestTransactions(limit: number = 10): Promise<Transaction[]> {
     const response = await fetch(
-      `${API_BASE}/transactions/latest?limit=${limit}`
+      `${API_BASE}/transactions/latest?limit=${limit}`,
     );
     if (!response.ok) {
       throw new Error("Failed to fetch latest transactions");
@@ -203,7 +203,7 @@ export const transactionService = {
         TransactionProduct,
         "id" | "transaction_id" | "created_at" | "updated_at"
       >[];
-    }
+    },
   ): Promise<Transaction> {
     const response = await fetch(`${API_BASE}/transactions`, {
       method: "POST",
@@ -220,7 +220,7 @@ export const transactionService = {
   },
 
   async getTransactionsByDateRange(
-    dateRange: DateRangeRequest
+    dateRange: DateRangeRequest,
   ): Promise<Transaction[]> {
     const response = await fetch(`${API_BASE}/transactions/date-range`, {
       method: "POST",
@@ -237,7 +237,7 @@ export const transactionService = {
   },
 
   async getProductSalesSummary(
-    dateRange: DateRangeRequest
+    dateRange: DateRangeRequest,
   ): Promise<ProductSalesSummary[]> {
     const response = await fetch(`${API_BASE}/reports/product-sales`, {
       method: "POST",
@@ -254,7 +254,7 @@ export const transactionService = {
   },
 
   async getTransactionProductDetails(
-    dateRange: DateRangeRequest
+    dateRange: DateRangeRequest,
   ): Promise<TransactionProductDetail[]> {
     const response = await fetch(`${API_BASE}/reports/transaction-products`, {
       method: "POST",
@@ -289,7 +289,7 @@ export const transactionService = {
   },
 
   async createProduct(
-    product: Omit<Product, "id" | "created_at" | "updated_at">
+    product: Omit<Product, "id" | "created_at" | "updated_at">,
   ): Promise<Product> {
     const response = await fetch(`${API_BASE}/products`, {
       method: "POST",
@@ -307,7 +307,7 @@ export const transactionService = {
   },
 
   async updateProduct(
-    product: Omit<Product, "created_at" | "updated_at">
+    product: Omit<Product, "created_at" | "updated_at">,
   ): Promise<Product> {
     console.log(product);
     const response = await fetch(`${API_BASE}/products/${product.id}`, {
@@ -334,7 +334,7 @@ export const transactionService = {
   },
 
   async createUser(
-    user: Omit<User, "id" | "created_at" | "updated_at">
+    user: Omit<User, "id" | "created_at" | "updated_at">,
   ): Promise<User> {
     const response = await fetch(`${API_BASE}/users`, {
       method: "POST",
@@ -382,9 +382,8 @@ export const transactionService = {
     user: Pick<
       User,
       "id" | "name" | "employee_id" | "department" | "phone" | "active"
-    >
+    >,
   ): Promise<User> {
-    console.log(user);
     const response = await fetch(`${API_BASE}/users/${user.id}`, {
       method: "PUT",
       headers: {
@@ -409,7 +408,7 @@ export const transactionService = {
   },
 
   async updateTransaction(
-    transaction: Omit<Transaction, "created_at" | "updated_at">
+    transaction: Omit<Transaction, "created_at" | "updated_at">,
   ): Promise<Transaction> {
     const response = await fetch(`${API_BASE}/transactions/${transaction.id}`, {
       method: "PUT",
@@ -437,12 +436,12 @@ export const transactionService = {
   // default limit 10
   async getTransactionsByUserId(
     userId: string,
-    limit = 10
+    limit = 10,
   ): Promise<EmployeeTransaction[]> {
     // make sure number is 5 digits
     const paddedId = userId.padStart(5, "0");
     const response = await fetch(
-      `${API_BASE}/users/${paddedId}/transactions?limit=${limit}`
+      `${API_BASE}/users/${paddedId}/transactions?limit=${limit}`,
     );
     if (!response.ok) {
       throw new Error("Failed to fetch user transactions");
@@ -488,13 +487,13 @@ export const transactionService = {
 
   // Add new functions for WhatsApp notification
   async sendBalanceNotification(
-    employeeId: string
+    employeeId: string,
   ): Promise<{ success: boolean; message?: string }> {
     const response = await fetch(
       `${API_BASE}/whatsapp/send-balance/${employeeId}`,
       {
         method: "POST",
-      }
+      },
     );
 
     if (!response.ok) {
