@@ -1,13 +1,13 @@
 package routes
 
 import (
-	"log"
 	"maya-canteen/frontend"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/middleware"
 	"net/http"
 
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 )
 
 // RegisterRoutes registers all routes for the application
@@ -47,6 +47,10 @@ func initDatabaseTables(db database.Service) {
 
 	// Initialize product table
 	if err := db.InitProductTable(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := db.InitTransactionProductTable(); err != nil {
 		log.Fatal(err)
 	}
 }

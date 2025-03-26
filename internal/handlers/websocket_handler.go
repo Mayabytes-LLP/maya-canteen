@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/handlers/common"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	log "github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 )
 

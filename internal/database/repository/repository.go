@@ -47,6 +47,15 @@ type ProductRepositoryInterface interface {
 	Delete(id int64) error
 }
 
+// TransactionProductRepositoryInterface defines operations for transaction product relationships
+type TransactionProductRepositoryInterface interface {
+	Repository
+	Create(transactionProduct *models.TransactionProduct) error
+	GetByTransactionID(transactionID int64) ([]models.TransactionProduct, error)
+	GetProductSalesSummary(startDate, endDate time.Time) ([]models.ProductSalesSummary, error)
+	GetTransactionProductDetails(startDate, endDate time.Time) ([]models.TransactionProductDetail, error)
+}
+
 // RepositoryFactory creates and returns repositories
 type RepositoryFactory struct {
 	db *sql.DB
@@ -70,4 +79,9 @@ func (f *RepositoryFactory) NewTransactionRepository() TransactionRepositoryInte
 // NewProductRepository creates a new product repository
 func (f *RepositoryFactory) NewProductRepository() ProductRepositoryInterface {
 	return NewProductRepository(f.db)
+}
+
+// NewTransactionProductRepository creates a new transaction product repository
+func (f *RepositoryFactory) NewTransactionProductRepository() TransactionProductRepositoryInterface {
+	return NewTransactionProductRepository(f.db)
 }

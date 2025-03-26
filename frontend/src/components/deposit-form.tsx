@@ -91,7 +91,7 @@ export default function DepositForm({
   const [userPopover, setUserPopover] = useState<boolean>(false);
   const [productPopover, setProductPopover] = useState<boolean>(false);
 
-  const { admin, currentUser } = useContext(AppContext);
+  const { admin } = useContext(AppContext);
 
   const defaultValues: FormValues = {
     user_id: "",
@@ -204,7 +204,7 @@ export default function DepositForm({
 
   // Handle form submission
   const onSubmit = async (data: FormValues) => {
-    if (!currentUser?.id) {
+    if (!data.user_id) {
       toast.error("Please select an employee");
       return;
     }
@@ -224,7 +224,6 @@ export default function DepositForm({
       let description = "";
 
       if (data.transaction_type === "purchase") {
-        // Handle purchase transaction
         const productsDescription = cartItems
           .map(
             (item) =>
@@ -240,16 +239,31 @@ export default function DepositForm({
           : productsDescription;
         finalAmount = totalAmount;
       } else {
-        // Handle deposit transaction
         description = data.description || "Cash Deposit";
         finalAmount = parseFloat(data.amount || "0");
       }
+
+      const products =
+        data.transaction_type === "purchase"
+          ? cartItems.map((item) => ({
+              product_id: item.productId,
+              product_name: item.productName,
+              quantity: item.quantity,
+              unit_price: item.price,
+              is_single_unit: !!item.single,
+              transaction_id: 0, // Placeholder, will be set by the backend
+              id: 0, // Placeholder, will be set by the backend
+              created_at: new Date().toISOString(), // Placeholder
+              updated_at: new Date().toISOString(), // Placeholder
+            }))
+          : undefined;
 
       const transaction = {
         user_id: Number(data.user_id),
         amount: finalAmount,
         description: description,
         transaction_type: data.transaction_type,
+        products: products,
       };
 
       await transactionService.createTransaction(transaction);

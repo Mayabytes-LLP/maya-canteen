@@ -117,7 +117,7 @@ export default function TransactionForm({
   useEffect(() => {
     const total = cartItems.reduce(
       (sum, item) => sum + item.price * item.quantity,
-      0,
+      0
     );
     setTotalAmount(total);
   }, [cartItems]);
@@ -137,7 +137,7 @@ export default function TransactionForm({
     }
 
     const selectedProduct = products.find(
-      (product) => product.id === productId,
+      (product) => product.id === productId
     );
 
     if (!selectedProduct) {
@@ -152,7 +152,7 @@ export default function TransactionForm({
 
     // Check if product is already in cart
     const existingItemIndex = cartItems.findIndex(
-      (item) => item.productId === productId && item.single === isSingleUnit,
+      (item) => item.productId === productId && item.single === isSingleUnit
     );
 
     if (existingItemIndex >= 0) {
@@ -216,7 +216,7 @@ export default function TransactionForm({
             (item) =>
               `${item.quantity}x at PKR.${item.price} ${item.productName} ${
                 item.single ? "(Single Unit)" : ""
-              }`,
+              }`
           )
           .filter(Boolean)
           .join(", ");
@@ -231,11 +231,28 @@ export default function TransactionForm({
         finalAmount = parseFloat(data.amount || "0");
       }
 
+      // Convert cart items to transaction products
+      const products =
+        data.transaction_type === "purchase"
+          ? cartItems.map((item) => ({
+              product_id: item.productId,
+              product_name: item.productName,
+              quantity: item.quantity,
+              unit_price: item.price,
+              is_single_unit: !!item.single,
+              transaction_id: 0, // Placeholder, will be set by the backend
+              id: 0, // Placeholder, will be set by the backend
+              created_at: new Date().toISOString(), // Placeholder
+              updated_at: new Date().toISOString(), // Placeholder
+            }))
+          : undefined;
+
       const transaction = {
         user_id: currentUser.id, // Always use current user's ID
         amount: finalAmount,
         description: description,
         transaction_type: data.transaction_type,
+        products: products,
       };
 
       await transactionService.createTransaction(transaction);
@@ -345,14 +362,14 @@ export default function TransactionForm({
                                 role="combobox"
                                 className={cn(
                                   "w-full justify-between",
-                                  !field.value && "text-muted-foreground",
+                                  !field.value && "text-muted-foreground"
                                 )}
                               >
                                 {field.value
                                   ? (() => {
                                       const cu = products.find(
                                         (product) =>
-                                          product.id.toString() === field.value,
+                                          product.id.toString() === field.value
                                       );
 
                                       if (!cu) {
@@ -382,7 +399,7 @@ export default function TransactionForm({
                                       onSelect={() => {
                                         form.setValue(
                                           "product_id",
-                                          product.id.toString(),
+                                          product.id.toString()
                                         );
                                         setProductPopover(false);
                                       }}
@@ -393,7 +410,7 @@ export default function TransactionForm({
                                           "ml-auto",
                                           product.id.toString() === field.value
                                             ? "opacity-100"
-                                            : "opacity-0",
+                                            : "opacity-0"
                                         )}
                                       />
                                     </CommandItem>
@@ -488,16 +505,16 @@ export default function TransactionForm({
                             (isSingleUnit &&
                             products.length > 0 &&
                             form.watch("product_id")
-                              ? (products.find(
+                              ? products.find(
                                   (product) =>
                                     product.id.toString() ===
-                                    form.watch("product_id"),
-                                )?.single_unit_price ?? 0)
-                              : (products.find(
+                                    form.watch("product_id")
+                                )?.single_unit_price ?? 0
+                              : products.find(
                                   (product) =>
                                     product.id.toString() ===
-                                    form.watch("product_id"),
-                                )?.price ?? 0))}{" "}
+                                    form.watch("product_id")
+                                )?.price ?? 0)}{" "}
                           to Cart
                         </Button>
                       </div>

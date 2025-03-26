@@ -2,11 +2,11 @@ package frontend
 
 import (
 	"embed"
-	"fmt"
 	"io/fs"
-	"log"
 	"net/http"
 	"os"
+
+	log "github.com/sirupsen/logrus"
 )
 
 //go:embed dist
@@ -16,7 +16,7 @@ var DistFS embed.FS
 func debugEmbeddedFS(embeddedFS embed.FS) {
 	entries, _ := embeddedFS.ReadDir(".")
 	for _, entry := range entries {
-		fmt.Printf("Embedded entry: %s\n", entry.Name())
+		log.Infof("Embedded entry: %s\n", entry.Name())
 	}
 }
 
@@ -33,12 +33,14 @@ func BuildHTTPFS() http.FileSystem {
 func ReadIndexHTML() ([]byte, error) {
 	if _, err := os.Stat("./dist"); err == nil {
 		// Development: read from disk
+		log.Infof("Reading index.html from disk")
 		return os.ReadFile("./dist/index.html")
 	}
 
 	// Production: read from embedded filesystem
 	fsys, err := fs.Sub(DistFS, "dist")
 	if err != nil {
+		log.Errorf("Error reading embedded filesystem: %v", err)
 		return nil, err
 	}
 

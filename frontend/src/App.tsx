@@ -1,19 +1,14 @@
-import CanteenPage from "@/components/canteen-page";
 import { ModeToggle } from "@/components/mode-toggle";
-import ProductPage from "@/components/product/product-page";
-import UserPage from "@/components/user/user-page";
 import { AppContext } from "@/context";
+import CanteenPage from "@/pages/canteen-page";
+import ProductPage from "@/pages/product-page";
+import ProductSalesPage from "@/pages/product-sales-page";
+import UserPage from "@/pages/user-page";
 import { useContext, useEffect, useState } from "react";
 import { navigationMenuTriggerStyle } from "./components/ui/navigation-menu";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router";
-import { toast } from "sonner";
-import { z } from "zod";
-import TransactionsPage from "./components/transactions-page";
 import {
   Form,
   FormControl,
@@ -21,10 +16,17 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "./components/ui/form";
-import { Input } from "./components/ui/input";
-import { cn } from "./lib/utils";
-import { transactionService } from "./services/transaction-service";
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import DashboardPage from "@/pages/dashboard-page";
+import { transactionService } from "@/services/transaction-service";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Navigate, NavLink, Route, Routes, useNavigate } from "react-router";
+import { toast } from "sonner";
+import { z } from "zod";
+import TransactionsPage from "./pages/transactions-page";
 
 // Form validation schema
 const formSchema = z.object({
@@ -105,6 +107,18 @@ function App() {
               {admin && (
                 <div className="ml-6 flex space-x-8">
                   <NavLink
+                    to="/dashboard"
+                    className={navigationMenuTriggerStyle()}
+                  >
+                    Dashboard
+                  </NavLink>
+                  <NavLink
+                    to="/product-sales"
+                    className={navigationMenuTriggerStyle()}
+                  >
+                    Product Sales
+                  </NavLink>
+                  <NavLink
                     to="/canteen"
                     className={navigationMenuTriggerStyle()}
                   >
@@ -174,6 +188,22 @@ function App() {
             element={
               <AuthGuard>
                 <TransactionsPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <AuthGuard>
+                <DashboardPage />
+              </AuthGuard>
+            }
+          />
+          <Route
+            path="/product-sales"
+            element={
+              <AuthGuard>
+                <ProductSalesPage />
               </AuthGuard>
             }
           />
@@ -285,7 +315,7 @@ function Screensaver() {
     "  _____",
     " /     \\",
     "|  o o  |",
-    "|      ᴥ  |",
+    "|       ᴥ  |",
     " \\_____/",
     "",
     "   ____",

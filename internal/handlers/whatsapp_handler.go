@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"fmt"
-	"log"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/handlers/common"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	waProto "go.mau.fi/whatsmeow/proto/waE2E"
 	"go.mau.fi/whatsmeow/types"
@@ -526,7 +526,6 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 
 // NotifyUserBalance sends a balance notification to a specific user
 func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Request) {
-
 	// Extract employee ID from URL params
 	vars := mux.Vars(r)
 	employeeID, err := h.ParseID(vars, "id")
@@ -555,9 +554,8 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Format the message
 	message := fmt.Sprintf(
-		"📊 *Balance Update* 📊\n\nDear %s,\n\nYour current canteen balance is: *PKR %.2f*\n\nThis is an automated message from Maya Canteen Management System.",
+		"**Balance Update** \n\nDear %s,\nYour current canteen balance is: *PKR %.2f*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System.",
 		user.Name,
 		float64(userBalance.Balance), // Assuming 'Amount' is the numeric field in models.UserBalance
 	)
@@ -600,7 +598,7 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 
 		// Format message
 		message := fmt.Sprintf(
-			"📊 *Balance Update* 📊\n\nDear %s,\n\nYour current canteen balance is: *PKR %.2f*\n\nThis is an automated message from Maya Canteen Management System.",
+			"**Balance Update** \n\nDear %s,\nYour current canteen balance is: *PKR %.2f*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System.",
 			balance.UserName,
 			balance.Balance,
 		)

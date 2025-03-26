@@ -6,8 +6,8 @@ import * as z from "zod";
 import ErrorBoundary from "@/components/error-boundary";
 import { Button } from "@/components/ui/button";
 import { transactionService } from "@/services/transaction-service";
-import UserBalances from "./user-balances";
-import UserForm from "./user-form";
+import UserBalances from "../components/user/user-balances";
+import UserForm from "../components/user/user-form";
 
 // User CSV schema matching the form validation
 const userCsvSchema = z.object({

@@ -45,6 +45,7 @@ import type { UserBalance as Balance } from "@/services/transaction-service";
 
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
+import { Link } from "react-router";
 
 interface BalanceTableProps {
   data: Balance[];
@@ -92,9 +93,10 @@ export function BalanceTable({
     name: string,
     balance: number
   ) => {
-    const message = `Hello ${name}, your current balance is PKR ${balance?.toFixed(
+    const message = `**Balance Update** \n\nDear ${name},\nYour current canteen balance is: *PKR ${balance.toFixed(
       2
-    )}`;
+    )}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System.`;
+
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
 
@@ -154,7 +156,6 @@ export function BalanceTable({
       header: "Actions",
       cell: ({ row }) => {
         const balance = row.original;
-
         return (
           <div className="flex items-center space-x-1">
             <Button
@@ -170,22 +171,23 @@ export function BalanceTable({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() =>
-                window.open(
-                  generateWhatsappUrl(
-                    balance.user_phone,
-                    balance.user_name,
-                    balance.balance
-                  ),
-                  "_blank"
-                )
-              }
               disabled={sendingNotification || !balance.user_phone}
               className="h-8 w-8 p-0"
               title="Send Balance Notification"
+              asChild
             >
-              <SendToBack className="h-4 w-4" />
-              <span className="sr-only">Send Balance Notification</span>
+              <Link
+                to={generateWhatsappUrl(
+                  balance.user_phone,
+                  balance.user_name,
+                  balance.balance
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <SendToBack className="h-4 w-4" />
+                <span className="sr-only">Send Balance Notification</span>
+              </Link>
             </Button>
             {admin && (
               <Button

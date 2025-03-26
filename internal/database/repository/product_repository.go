@@ -2,9 +2,10 @@ package repository
 
 import (
 	"database/sql"
-	"fmt"
 	"maya-canteen/internal/models"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // ProductRepository handles all database operations related to products
@@ -36,7 +37,12 @@ func (r *ProductRepository) InitTable() error {
 		)
 	`
 	_, err := r.db.Exec(query)
-	return err
+	if err != nil {
+		log.Errorf("Error creating products table: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // addActiveColumnIfNeeded checks if the active column exists and adds it if needed
@@ -50,15 +56,19 @@ func (r *ProductRepository) addActiveColumnIfNeeded() {
 	`).Scan(&colExists)
 
 	if err != nil || colExists {
+		if err != nil {
+			log.Errorf("Error checking if active column exists: %v", err)
+		}
+		log.Info("Active column already exists in products table")
 		return // Either error occurred or column already exists
 	}
 
 	// Add the column if it doesn't exist
 	_, err = r.db.Exec(`ALTER TABLE products ADD COLUMN active BOOLEAN NOT NULL DEFAULT 1`)
 	if err != nil {
-		fmt.Printf("Error adding active column: %v\n", err)
+		log.Errorf("Error adding active column to products table: %v", err)
 	} else {
-		fmt.Println("Added active column to products table")
+		log.Info("Added active column to products table")
 	}
 }
 
@@ -96,6 +106,7 @@ func (r *ProductRepository) Create(product *models.Product) error {
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
+		log.Errorf("Error getting last insert ID: %v", err)
 		return err
 	}
 	product.ID = id
@@ -122,6 +133,7 @@ func (r *ProductRepository) GetAll() ([]models.Product, error) {
 	ORDER BY name ASC`
 	rows, err := r.db.Query(query)
 	if err != nil {
+		log.Errorf("Error getting all products: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -142,7 +154,7 @@ func (r *ProductRepository) GetAll() ([]models.Product, error) {
 			&product.UpdatedAt,
 		)
 		if err != nil {
-			fmt.Println(err)
+			log.Errorf("Error scanning product row: %v", err)
 			return nil, err
 		}
 		products = append(products, product)
@@ -180,9 +192,11 @@ func (r *ProductRepository) Get(id int64) (*models.Product, error) {
 		&product.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		log.Errorf("No product found with ID %d", id)
 		return nil, nil
 	}
 	if err != nil {
+		log.Errorf("Error in getting product by ID: %v", err)
 		return nil, err
 	}
 	return &product, nil
@@ -217,6 +231,7 @@ func (r *ProductRepository) Update(product *models.Product) error {
 		product.ID,
 	)
 	if err != nil {
+		log.Errorf("Error updating product: %v", err)
 		return err
 	}
 	product.UpdatedAt = now
@@ -227,5 +242,10 @@ func (r *ProductRepository) Update(product *models.Product) error {
 func (r *ProductRepository) Delete(id int64) error {
 	query := `DELETE FROM products WHERE id = ?`
 	_, err := r.db.Exec(query, id)
-	return err
+	if err != nil {
+		log.Errorf("Error deleting product: %v", err)
+		return err
+	}
+
+	return nil
 }

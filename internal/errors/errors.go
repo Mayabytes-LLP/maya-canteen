@@ -3,6 +3,8 @@ package errors
 import (
 	"errors"
 	"fmt"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Common error types
@@ -24,6 +26,7 @@ type AppError struct {
 
 // Error returns the error message
 func (e *AppError) Error() string {
+	log.Error(e.Err)
 	if e.Message != "" {
 		return e.Message
 	}
@@ -32,11 +35,13 @@ func (e *AppError) Error() string {
 
 // Unwrap returns the underlying error
 func (e *AppError) Unwrap() error {
+	log.Error(e.Err)
 	return e.Err
 }
 
 // New creates a new AppError
 func New(err error, message string, code string) *AppError {
+	log.Error(err)
 	return &AppError{
 		Err:     err,
 		Message: message,
@@ -46,6 +51,7 @@ func New(err error, message string, code string) *AppError {
 
 // Newf creates a new AppError with formatted message
 func Newf(err error, code string, format string, args ...interface{}) *AppError {
+	log.Error(err)
 	return &AppError{
 		Err:     err,
 		Message: fmt.Sprintf(format, args...),
@@ -55,6 +61,7 @@ func Newf(err error, code string, format string, args ...interface{}) *AppError 
 
 // NotFound creates a new not found error
 func NotFound(resource string, id interface{}) *AppError {
+	log.Error(ErrNotFound)
 	return &AppError{
 		Err:     ErrNotFound,
 		Message: fmt.Sprintf("%s with ID %v not found", resource, id),
@@ -64,6 +71,7 @@ func NotFound(resource string, id interface{}) *AppError {
 
 // InvalidInput creates a new invalid input error
 func InvalidInput(message string) *AppError {
+	log.Error(ErrInvalidInput)
 	return &AppError{
 		Err:     ErrInvalidInput,
 		Message: message,
@@ -73,6 +81,7 @@ func InvalidInput(message string) *AppError {
 
 // Internal creates a new internal error
 func Internal(err error) *AppError {
+	log.Error(err)
 	if err != nil {
 		return &AppError{
 			Err:     err,

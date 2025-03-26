@@ -20,7 +20,12 @@ func RegisterTransactionRoutes(router *mux.Router, db database.Service) {
 	router.HandleFunc("/api/transactions/{id}", transactionHandler.GetTransaction).Methods("GET")
 	router.HandleFunc("/api/transactions/{id}", transactionHandler.UpdateTransaction).Methods("PUT")
 	router.HandleFunc("/api/transactions/{id}", transactionHandler.DeleteTransaction).Methods("DELETE")
+	router.HandleFunc("/api/transactions/{id}/products", transactionHandler.GetTransactionProducts).Methods("GET")
 	router.HandleFunc("/api/users/{user_id}/transactions", transactionHandler.GetTransactionsByUserID).Methods("GET")
 	router.HandleFunc("/api/users/{user_id}/balance", transactionHandler.GetUserBalanceByUserID).Methods("GET")
 	router.HandleFunc("/api/users/balances", transactionHandler.GetUsersBalances).Methods("GET")
+
+	// New reporting endpoints
+	router.HandleFunc("/api/reports/product-sales", transactionHandler.GetProductSalesSummary).Methods("POST")
+	router.HandleFunc("/api/reports/transaction-products", transactionHandler.GetTransactionProductDetails).Methods("POST")
 }

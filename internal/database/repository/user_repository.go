@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"maya-canteen/internal/models"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // UserRepository handles all database operations related to users
@@ -36,8 +38,10 @@ func (r *UserRepository) InitTable() error {
 	`
 	_, err := r.db.Exec(query)
 	if err != nil {
+		log.Errorf("Error creating users table: %v", err)
 		return err
 	}
+	log.Info("Created Users Table")
 
 	err1 := r.Create(&models.User{
 		Name:       "Abdul Rafay",
@@ -63,7 +67,7 @@ func (r *UserRepository) InitTable() error {
 	})
 
 	if err1 != nil || err2 != nil || err3 != nil {
-		fmt.Printf("Error in adding admin possibly already exists to the database %v\n %v\n %v\n", err1, err2, err3)
+		log.Errorf("Error in adding admin possibly already exists to the database:\n %v\n %v\n %v\n", err1, err2, err3)
 	}
 
 	return nil
@@ -80,15 +84,19 @@ func (r *UserRepository) addActiveColumnIfNeeded() {
 	`).Scan(&colExists)
 
 	if err != nil || colExists {
+		if err != nil {
+			log.Errorf("Error checking if active column exists: %v", err)
+		}
+		log.Info("Active column already exists in users table")
 		return // Either error occurred or column already exists
 	}
 
 	// Add the column if it doesn't exist
 	_, err = r.db.Exec(`ALTER TABLE users ADD COLUMN active BOOLEAN NOT NULL DEFAULT 1`)
 	if err != nil {
-		fmt.Printf("Error adding active column: %v\n", err)
+		log.Errorf("Error adding active column to users table: %v", err)
 	} else {
-		fmt.Println("Added active column to users table")
+		log.Info("Added active column to users table")
 	}
 }
 
@@ -115,10 +123,12 @@ func (r *UserRepository) Create(user *models.User) error {
 		now,
 	)
 	if err != nil {
+		log.Errorf("Error inserting user: %v", err)
 		return err
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
+		log.Errorf("Error getting last insert ID: %v", err)
 		return err
 	}
 	user.ID = id
@@ -132,6 +142,7 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 	query := `SELECT id, name, employee_id, department, phone, active, created_at, updated_at FROM users ORDER BY name ASC`
 	rows, err := r.db.Query(query)
 	if err != nil {
+		log.Errorf("Error getting all users: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -150,6 +161,7 @@ func (r *UserRepository) GetAll() ([]models.User, error) {
 			&user.UpdatedAt,
 		)
 		if err != nil {
+			log.Errorf("Error scanning user row: %v", err)
 			return nil, err
 		}
 		users = append(users, user)
@@ -173,10 +185,11 @@ func (r *UserRepository) Get(id int64) (*models.User, error) {
 		&user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		log.Errorf("No user found with ID %d", id)
 		return nil, nil
 	}
 	if err != nil {
-		fmt.Println("Error in getting user by ID", err)
+		log.Errorf("Error in getting user by ID: %v", err)
 		return nil, err
 	}
 	return &user, nil
@@ -197,9 +210,11 @@ func (r *UserRepository) GetByEmployeeID(employeeID string) (*models.User, error
 		&user.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		log.Errorf("No user found with employee ID %s", employeeID)
 		return nil, nil
 	}
 	if err != nil {
+		log.Errorf("Error in getting user by employee ID: %v", err)
 		return nil, err
 	}
 	return &user, nil
@@ -225,6 +240,7 @@ func (r *UserRepository) Update(user *models.User) error {
 		user.ID,
 	)
 	if err != nil {
+		log.Errorf("Error updating user: %v", err)
 		return err
 	}
 	user.UpdatedAt = now

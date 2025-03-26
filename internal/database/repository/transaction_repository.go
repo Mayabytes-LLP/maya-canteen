@@ -2,9 +2,10 @@ package repository
 
 import (
 	"database/sql"
-	"log"
 	"maya-canteen/internal/models"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // TransactionRepository handles all database operations related to transactions
@@ -32,7 +33,12 @@ func (r *TransactionRepository) InitTable() error {
 		)
 	`
 	_, err := r.db.Exec(query)
-	return err
+	if err != nil {
+		log.Errorf("Error creating transactions table: %v", err)
+	}
+
+	log.Info("Created Transactions Table")
+	return nil
 }
 
 // Create inserts a new transaction into the database
@@ -61,10 +67,12 @@ func (r *TransactionRepository) Create(transaction *models.Transaction) error {
 		now,
 	)
 	if err != nil {
+		log.Errorf("Error creating transaction: %v", err)
 		return err
 	}
 	id, err := result.LastInsertId()
 	if err != nil {
+		log.Errorf("Error getting last insert ID: %v", err)
 		return err
 	}
 	transaction.ID = id
@@ -95,6 +103,7 @@ func (r *TransactionRepository) GetAll() ([]models.Transaction, error) {
 			&transaction.UpdatedAt,
 		)
 		if err != nil {
+			log.Errorf("Error scanning row: %v", err)
 			return nil, err
 		}
 		transactions = append(transactions, transaction)
@@ -120,9 +129,11 @@ func (r *TransactionRepository) Get(id int64) (*models.Transaction, error) {
 		&transaction.UpdatedAt,
 	)
 	if err == sql.ErrNoRows {
+		log.Errorf("Transaction with ID %d not found", id)
 		return nil, nil
 	}
 	if err != nil {
+		log.Errorf("Error scanning transaction row: %v", err)
 		return nil, err
 	}
 	return &transaction, nil
@@ -156,13 +167,16 @@ func (r *TransactionRepository) Update(transaction *models.Transaction) error {
 func (r *TransactionRepository) Delete(id int64) error {
 	query := `DELETE FROM transactions WHERE id = ?`
 	_, err := r.db.Exec(query, id)
-	return err
+	if err != nil {
+		log.Errorf("Error deleting transaction: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // GetByUserID retrieves all transactions for a specific user
 func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.EmployeeTransaction, error) {
-	log.Printf("GetByUserID called with userID: %d", userID)
-	log.Printf("Limit: %d", limit)
 	query := `
 	  SELECT
         users.name,
@@ -183,7 +197,7 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 	`
 	rows, err := r.db.Query(query, userID, limit)
 	if err != nil {
-		log.Printf("Error executing query: %v", err)
+		log.Errorf("Error executing query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -204,13 +218,13 @@ func (r *TransactionRepository) GetByUserID(userID int64, limit int) ([]models.E
 			&transaction.UpdatedAt,
 		)
 		if err != nil {
-			log.Printf("Error scanning row: %v", err)
+			log.Errorf("Error scanning row: %v", err)
 			return nil, err
 		}
 		transactions = append(transactions, transaction)
 	}
 	if err := rows.Err(); err != nil {
-		log.Printf("Error with rows: %v", err)
+		log.Errorf("Error with transaction rows: %v", err)
 		return nil, err
 	}
 	return transactions, nil
@@ -224,6 +238,7 @@ func (r *TransactionRepository) GetByDateRange(startDate, endDate time.Time) ([]
 	query := `SELECT * FROM transactions WHERE created_at BETWEEN ? AND ? ORDER BY created_at DESC`
 	rows, err := r.db.Query(query, startDate, endDate)
 	if err != nil {
+		log.Errorf("Error executing query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -241,6 +256,7 @@ func (r *TransactionRepository) GetByDateRange(startDate, endDate time.Time) ([]
 			&transaction.UpdatedAt,
 		)
 		if err != nil {
+			log.Errorf("Error scanning row: %v", err)
 			return nil, err
 		}
 		transactions = append(transactions, transaction)
@@ -253,6 +269,7 @@ func (r *TransactionRepository) GetLatest(limit int) ([]models.Transaction, erro
 	query := `SELECT * FROM transactions ORDER BY created_at DESC LIMIT ?`
 	rows, err := r.db.Query(query, limit)
 	if err != nil {
+		log.Errorf("Error executing query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -270,6 +287,7 @@ func (r *TransactionRepository) GetLatest(limit int) ([]models.Transaction, erro
 			&transaction.UpdatedAt,
 		)
 		if err != nil {
+			log.Errorf("Error scanning row: %v", err)
 			return nil, err
 		}
 		transactions = append(transactions, transaction)
@@ -294,7 +312,7 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 
 	rows, err := r.db.Query(query)
 	if err != nil {
-		log.Printf("Error executing query: %v", err)
+		log.Errorf("Error executing query: %v", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -311,7 +329,7 @@ func (r *TransactionRepository) GetUsersBalances() ([]models.UserBalance, error)
 			&balance.Balance,
 		)
 		if err != nil {
-			log.Printf("Error scanning row: %v", err)
+			log.Errorf("Error scanning row: %v", err)
 			return nil, err
 		}
 		balances = append(balances, balance)
@@ -343,6 +361,7 @@ func (r *TransactionRepository) GetUserBalanceByID(userID int64) (models.UserBal
 		&balance.Balance,
 	)
 	if err != nil {
+		log.Errorf("Error scanning row: %v", err)
 		return models.UserBalance{}, err
 	}
 	return balance, nil

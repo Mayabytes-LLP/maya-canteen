@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"log"
 	"net/http"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Middleware represents an HTTP middleware
@@ -66,14 +67,21 @@ func Logger() Middleware {
 			next.ServeHTTP(rw, r)
 
 			// Log the request
-			log.Printf(
-				"%s %s %s %d %s",
-				r.Method,
-				r.RequestURI,
-				r.RemoteAddr,
-				rw.statusCode,
-				time.Since(start),
-			)
+			// log.Printf(
+			// 	"%s %s %s %d %s",
+			// 	r.Method,
+			// 	r.RequestURI,
+			// 	r.RemoteAddr,
+			// 	rw.statusCode,
+			// 	time.Since(start),
+			// )
+			log.WithFields(log.Fields{
+				"method":        r.Method,
+				"request_uri":   r.RequestURI,
+				"remote_addr":   r.RemoteAddr,
+				"status_code":   rw.statusCode,
+				"response_time": time.Since(start),
+			})
 		})
 	}
 }
@@ -84,7 +92,7 @@ func Recover() Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if err := recover(); err != nil {
-					log.Printf("Panic: %v", err)
+					log.Errorf("Panic: %v", err)
 					http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 				}
 			}()

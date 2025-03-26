@@ -12,7 +12,45 @@ export interface Transaction {
   transaction_type: string;
   created_at: string;
   updated_at: string;
+  products?: TransactionProduct[];
 }
+
+export interface TransactionProduct {
+  id: number;
+  transaction_id: number;
+  product_id: number;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  is_single_unit: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductSalesSummary {
+  product_id: number;
+  product_name: string;
+  product_type: string;
+  total_quantity: number;
+  total_sales: number;
+  single_unit_sold: number;
+  full_unit_sold: number;
+}
+
+export interface TransactionProductDetail {
+  id: number;
+  transaction_id: number;
+  product_id: number;
+  product_name: string;
+  product_type: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  is_single_unit: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface EmployeeTransaction extends Transaction {
   employee_id: string;
   department: string;
@@ -79,28 +117,16 @@ export const zodUserSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
   // employee_id must be a string of numbers
   employee_id: z.string().refine((val) => /^\d+$/.test(val), {
-    message: "Invalid employee ID. Must be numbers",
+    message: "Employee ID must be a number",
   }),
-  department: z.enum(Departments),
+  department: z.string().min(2, "Department must be at least 2 characters"),
   phone: z
     .string()
-    .trim()
-    .refine(
-      (val) =>
-        /^0[3-9][0-9]{9}$/.test(val) || // 03XX-XXXXXXX
-        /^\+92[0-9]{10}$/.test(val) || // +92XXXXXXXXXX
-        /^\+1[0-9]{10}$/.test(val) || // +1XXXXXXXXXX
-        /^03[0-9]{2}[-\s]?[0-9]{7}$/.test(val), // 0311-5410355 or 0332 2723005
-      {
-        message:
-          "Invalid phone number format. Expected: 03XXXXXXXXX, +92XXXXXXXXXX, +1XXXXXXXXXX or 0311-XXXXXXX",
-      }
-    )
+    .optional()
     .transform((val) => {
-      // Remove spaces and dashes
-      val = val.replace(/[\s-]/g, "");
+      if (!val) return "";
 
-      // Handle Pakistan numbers
+      // Format Pakistan numbers
       if (val.startsWith("0")) {
         return `+92${val.slice(1)}`;
       }
@@ -158,11 +184,25 @@ export const transactionService = {
     return res.data;
   },
 
+  async getTransactionProducts(id: number): Promise<TransactionProduct[]> {
+    const response = await fetch(`${API_BASE}/transactions/${id}/products`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch transaction products");
+    }
+    const res = await response.json();
+    return res.data;
+  },
+
   async createTransaction(
     transaction: Omit<
       Transaction,
       "id" | "user_name" | "created_at" | "updated_at"
-    >
+    > & {
+      products?: Omit<
+        TransactionProduct,
+        "id" | "transaction_id" | "created_at" | "updated_at"
+      >[];
+    }
   ): Promise<Transaction> {
     const response = await fetch(`${API_BASE}/transactions`, {
       method: "POST",
@@ -195,14 +235,47 @@ export const transactionService = {
     return res.data;
   },
 
+  async getProductSalesSummary(
+    dateRange: DateRangeRequest
+  ): Promise<ProductSalesSummary[]> {
+    const response = await fetch(`${API_BASE}/reports/product-sales`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(dateRange),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch product sales summary");
+    }
+    const res = await response.json();
+    return res.data;
+  },
+
+  async getTransactionProductDetails(
+    dateRange: DateRangeRequest
+  ): Promise<TransactionProductDetail[]> {
+    const response = await fetch(`${API_BASE}/reports/transaction-products`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(dateRange),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to fetch transaction product details");
+    }
+    const res = await response.json();
+    return res.data;
+  },
+
   async getAllUsers(): Promise<User[]> {
     const response = await fetch(`${API_BASE}/users`);
     if (!response.ok) {
       throw new Error("Failed to fetch users");
     }
-
-    const result = await response.json();
-    return result.data;
+    const res = await response.json();
+    return res.data;
   },
 
   async getAllProducts(): Promise<Product[]> {
@@ -210,8 +283,8 @@ export const transactionService = {
     if (!response.ok) {
       throw new Error("Failed to fetch products");
     }
-    const result = await response.json();
-    return result.data;
+    const res = await response.json();
+    return res.data;
   },
 
   async createProduct(
@@ -255,7 +328,7 @@ export const transactionService = {
       method: "DELETE",
     });
     if (!response.ok) {
-      throw new Error("Failed to delete user");
+      throw new Error("Failed to delete product");
     }
   },
 
@@ -272,6 +345,23 @@ export const transactionService = {
     if (!response.ok) {
       throw new Error("Failed to create user");
     }
+    const res = await response.json();
+    return res.data;
+  },
+
+  async importUsers(file: File): Promise<UserCSVResponse> {
+    const formData = new FormData();
+    formData.append("csv_file", file);
+
+    const response = await fetch(`${API_BASE}/users/import`, {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to import users");
+    }
+
     const res = await response.json();
     return res.data;
   },
@@ -348,58 +438,47 @@ export const transactionService = {
     userId: string,
     limit = 10
   ): Promise<EmployeeTransaction[]> {
+    // make sure number is 5 digits
+    const paddedId = userId.padStart(5, "0");
     const response = await fetch(
-      `${API_BASE}/users/${userId}/transactions?limit=${limit}`
+      `${API_BASE}/users/${paddedId}/transactions?limit=${limit}`
     );
     if (!response.ok) {
       throw new Error("Failed to fetch user transactions");
     }
     const res = await response.json();
-    console.log(userId, res.data);
     return res.data;
   },
 
   async getUsersBalances(): Promise<UserBalance[]> {
-    try {
-      const response = await fetch(`${API_BASE}/users/balances`);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch user's balance: ${errorText}`);
-      }
-      const res = await response.json();
-      return res.data;
-    } catch (error) {
-      console.error("Error fetching user's balance:", error);
-      throw error;
+    const response = await fetch(`${API_BASE}/users/balances`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch user balances");
     }
+    const res = await response.json();
+    return res.data;
   },
 
   async getBalanceByUserId(userId: number): Promise<UserBalance> {
-    try {
-      const response = await fetch(`${API_BASE}/users/${userId}/balance`);
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to fetch user's balance: ${errorText}`);
-      }
-      const res = await response.json();
-      return res.data;
-    } catch (error) {
-      console.error("Error fetching user's balance:", error);
-      throw error;
+    const response = await fetch(`${API_BASE}/users/${userId}/balance`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch user balance");
     }
+    const res = await response.json();
+    return res.data;
   },
 
   async uploadUsersCsv(file: File): Promise<UserCSVResponse> {
     const formData = new FormData();
     formData.append("file", file);
 
-    const response = await fetch(`${API_BASE}/users/upload-csv`, {
+    const response = await fetch(`${API_BASE}/users/csv`, {
       method: "POST",
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error("Failed to upload users CSV");
+      throw new Error("Failed to upload CSV");
     }
 
     const res = await response.json();
@@ -410,64 +489,34 @@ export const transactionService = {
   async sendBalanceNotification(
     employeeId: string
   ): Promise<{ success: boolean; message?: string }> {
-    try {
-      const response = await fetch(
-        `${API_BASE}/whatsapp/notify/${employeeId}`,
-        {
-          method: "POST",
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          message: result.error || "Failed to send notification",
-        };
+    const response = await fetch(
+      `${API_BASE}/whatsapp/send-balance/${employeeId}`,
+      {
+        method: "POST",
       }
+    );
 
-      return {
-        success: true,
-        message: result.message || "Notification sent successfully",
-      };
-    } catch (error) {
-      console.error("Error sending balance notification:", error);
-      return {
-        success: false,
-        message: "Error sending notification",
-      };
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, message: error.message };
     }
+
+    return { success: true };
   },
 
   async sendAllBalanceNotifications(): Promise<{
     success: boolean;
     message?: string;
   }> {
-    try {
-      const response = await fetch(`${API_BASE}/whatsapp/notify-all`, {
-        method: "POST",
-      });
+    const response = await fetch(`${API_BASE}/whatsapp/send-all-balances`, {
+      method: "POST",
+    });
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        return {
-          success: false,
-          message: result.error || "Failed to send notifications",
-        };
-      }
-
-      return {
-        success: true,
-        message: result.message || "Notifications sent successfully",
-      };
-    } catch (error) {
-      console.error("Error sending all balance notifications:", error);
-      return {
-        success: false,
-        message: "Error sending notifications",
-      };
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, message: error.message };
     }
+
+    return { success: true };
   },
 };

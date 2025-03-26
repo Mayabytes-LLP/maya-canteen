@@ -1,5 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 
+import TransactionForm from "@/components/transaction-form";
+import TransactionUserList from "@/components/transaction-user-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,8 +12,6 @@ import {
   type UserBalance,
 } from "@/services/transaction-service";
 import { toast } from "sonner";
-import TransactionForm from "./transaction-form";
-import TransactionUserList from "./transaction-user-list";
 
 export default function CanteenPage() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);

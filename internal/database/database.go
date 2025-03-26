@@ -4,13 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"maya-canteen/internal/database/repository"
 	"maya-canteen/internal/models"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	_ "github.com/joho/godotenv/autoload"
 	_ "github.com/mattn/go-sqlite3"
@@ -49,6 +50,7 @@ type Service interface {
 	GetTransactionsByDateRange(startDate, endDate time.Time) ([]models.Transaction, error)
 	GetUsersBalances() ([]models.UserBalance, error)
 	GetUserBalanceByUserID(userID int64) (models.UserBalance, error)
+
 	// Product-related operations
 	InitProductTable() error
 	CreateProduct(product *models.Product) error
@@ -56,14 +58,25 @@ type Service interface {
 	GetProduct(id int64) (*models.Product, error)
 	UpdateProduct(product *models.Product) error
 	DeleteProduct(id int64) error
+
+	// Transaction product operations
+	InitTransactionProductTable() error
+	CreateTransactionProduct(transactionProduct *models.TransactionProduct) error
+	GetTransactionProducts(transactionID int64) ([]models.TransactionProduct, error)
+	GetProductSalesSummary(startDate, endDate time.Time) ([]models.ProductSalesSummary, error)
+	GetTransactionProductDetails(startDate, endDate time.Time) ([]models.TransactionProductDetail, error)
+
+	// Transaction creation with products
+	CreateTransactionWithProducts(transaction *models.Transaction, products []models.TransactionProduct) error
 }
 
 type service struct {
-	db                    *sql.DB
-	repositoryFactory     *repository.RepositoryFactory
-	userRepository        repository.UserRepositoryInterface
-	transactionRepository repository.TransactionRepositoryInterface
-	productRepository     repository.ProductRepositoryInterface
+	db                           *sql.DB
+	repositoryFactory            *repository.RepositoryFactory
+	userRepository               repository.UserRepositoryInterface
+	transactionRepository        repository.TransactionRepositoryInterface
+	productRepository            repository.ProductRepositoryInterface
+	transactionProductRepository repository.TransactionProductRepositoryInterface
 }
 
 var (
@@ -88,20 +101,19 @@ func New() Service {
 		// Extract the directory path only if a slash exists
 		dbPath = dburl[:lastSlashIndex]
 		if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-			log.Println("Creating DB Path", dbPath)
+			log.Info("Creating DB Path at", dbPath)
 			err = os.MkdirAll(dbPath, os.ModePerm)
 			if err != nil {
-				log.Fatalf("Failed to create database directory: %v", err)
+				log.Fatalf("Error creating DB Path: %v", err)
 			}
 		} else {
-			log.Println("DB Path exists at", dbPath)
+			log.Info("DB Path already exists at", dbPath)
 		}
 	} else {
 		// No directory in path, using current directory
-		log.Println("No directory specified in DB path, using current directory")
+		log.Info("Using current directory for DB Path")
 	}
 
-	log.Println("DB URL", dburl)
 	db, err := sql.Open("sqlite3", dburl)
 	if err != nil {
 		// This will not be a connection error, but a DSN parse error or
@@ -113,12 +125,14 @@ func New() Service {
 	repoFactory := repository.NewRepositoryFactory(db)
 
 	dbInstance = &service{
-		db:                    db,
-		repositoryFactory:     repoFactory,
-		userRepository:        repoFactory.NewUserRepository(),
-		transactionRepository: repoFactory.NewTransactionRepository(),
-		productRepository:     repoFactory.NewProductRepository(),
+		db:                           db,
+		repositoryFactory:            repoFactory,
+		userRepository:               repoFactory.NewUserRepository(),
+		transactionRepository:        repoFactory.NewTransactionRepository(),
+		productRepository:            repoFactory.NewProductRepository(),
+		transactionProductRepository: repoFactory.NewTransactionProductRepository(),
 	}
+	log.Info("Connected to database:", dburl)
 	return dbInstance
 }
 
@@ -280,4 +294,52 @@ func (s *service) UpdateProduct(product *models.Product) error {
 
 func (s *service) DeleteProduct(id int64) error {
 	return s.productRepository.Delete(id)
+}
+
+// Transaction product operations
+func (s *service) InitTransactionProductTable() error {
+	return s.transactionProductRepository.InitTable()
+}
+
+func (s *service) CreateTransactionProduct(transactionProduct *models.TransactionProduct) error {
+	return s.transactionProductRepository.Create(transactionProduct)
+}
+
+func (s *service) GetTransactionProducts(transactionID int64) ([]models.TransactionProduct, error) {
+	return s.transactionProductRepository.GetByTransactionID(transactionID)
+}
+
+func (s *service) GetProductSalesSummary(startDate, endDate time.Time) ([]models.ProductSalesSummary, error) {
+	return s.transactionProductRepository.GetProductSalesSummary(startDate, endDate)
+}
+
+func (s *service) GetTransactionProductDetails(startDate, endDate time.Time) ([]models.TransactionProductDetail, error) {
+	return s.transactionProductRepository.GetTransactionProductDetails(startDate, endDate)
+}
+
+// CreateTransactionWithProducts creates a transaction and its associated products in a single transaction
+func (s *service) CreateTransactionWithProducts(transaction *models.Transaction, products []models.TransactionProduct) error {
+	// Start a database transaction
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+
+	// Create the transaction first
+	if err := s.transactionRepository.Create(transaction); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Associate products with the transaction
+	for i := range products {
+		products[i].TransactionID = transaction.ID
+		if err := s.transactionProductRepository.Create(&products[i]); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	// Commit the transaction
+	return tx.Commit()
 }
