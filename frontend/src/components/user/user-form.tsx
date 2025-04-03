@@ -129,7 +129,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
                           role="combobox"
                           className={cn(
                             "w-full justify-between",
-                            !field.value && "text-muted-foreground"
+                            !field.value && "text-muted-foreground",
                           )}
                         >
                           {field.value || "Select Department"}
@@ -161,7 +161,7 @@ export default function UserForm({ onUserAdded }: UserFormProps) {
                                     "ml-auto",
                                     department === field.value
                                       ? "opacity-100"
-                                      : "opacity-0"
+                                      : "opacity-0",
                                   )}
                                 />
                               </CommandItem>

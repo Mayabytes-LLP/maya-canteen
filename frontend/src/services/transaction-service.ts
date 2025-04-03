@@ -61,9 +61,9 @@ export interface User {
   name: string;
   employee_id: string;
   department: string;
-  phone: string;
+  phone?: string;
   active: boolean;
-  last_notification: string;
+  last_notification?: string;
   created_at: string;
   updated_at: string;
 }
