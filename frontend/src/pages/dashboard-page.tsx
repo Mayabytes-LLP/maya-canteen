@@ -3,6 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -15,6 +23,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import UserTransactions from "@/components/user/user-transactions";
+import { AppContext } from "@/context";
 import { cn } from "@/lib/utils";
 import {
   DateRangeRequest,
@@ -28,9 +38,12 @@ import {
   CalendarIcon,
   CreditCardIcon,
   DownloadIcon,
+  Search,
+  Send,
   WalletIcon,
+  X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { DateRange } from "react-day-picker";
 import {
   Bar,
@@ -56,6 +69,23 @@ const DashboardPage = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [userBalances, setUserBalances] = useState<UserBalance[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [openTransactionsDialog, setOpenTransactionsDialog] = useState(false);
+  const [sendingNotification, setSendingNotification] = useState(false);
+  const { admin, whatsappStatus } = useContext(AppContext);
+
+  // Filtered balances based on search query
+  const filteredBalances = userBalances.filter(
+    (user) =>
+      user.balance !== 0 &&
+      (searchQuery === "" ||
+        user.user_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        user.user_department
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase()) ||
+        user.employee_id.toLowerCase().includes(searchQuery.toLowerCase())),
+  );
 
   // Calculated summary values
   const [summaryData, setSummaryData] = useState({
@@ -88,18 +118,24 @@ const DashboardPage = () => {
       // Fetch transactions for the date range
       const transactionsData =
         await transactionService.getTransactionsByDateRange(dateRangeRequest);
+      console.log("Transactions data:", transactionsData);
 
       // Fetch user balances
       const balancesData = await transactionService.getUsersBalances();
       setUserBalances(balancesData);
+      console.log("User balances:", balancesData);
 
       // Get latest transactions
-      const latestTransactions = await transactionService.getLatestTransactions(
-        5
-      );
+      const latestTransactions =
+        await transactionService.getLatestTransactions(5);
+      console.log("Latest transactions:", latestTransactions);
 
       // Process the data for summaries
-      processData(transactionsData, balancesData, latestTransactions);
+      processData(
+        transactionsData ?? [],
+        balancesData ?? [],
+        latestTransactions ?? [],
+      );
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
       toast.error("Failed to load dashboard data");
@@ -118,7 +154,7 @@ const DashboardPage = () => {
   const processData = (
     transactionsData: Transaction[],
     balancesData: UserBalance[],
-    latestTransactions: Transaction[]
+    latestTransactions: Transaction[],
   ) => {
     // Calculate total received (deposits) and owed (negative balances)
     const totalReceived = transactionsData
@@ -140,20 +176,23 @@ const DashboardPage = () => {
       .reduce((sum, user) => sum + user.balance, 0);
 
     // Group transactions by type
-    const typeGroups = transactionsData.reduce((groups, transaction) => {
-      const type = transaction.transaction_type;
-      if (!groups[type]) {
-        groups[type] = 0;
-      }
-      groups[type] += Math.abs(transaction.amount);
-      return groups;
-    }, {} as Record<string, number>);
+    const typeGroups = transactionsData.reduce(
+      (groups, transaction) => {
+        const type = transaction.transaction_type;
+        if (!groups[type]) {
+          groups[type] = 0;
+        }
+        groups[type] += Math.abs(transaction.amount);
+        return groups;
+      },
+      {} as Record<string, number>,
+    );
 
     const transactionsByType = Object.entries(typeGroups).map(
       ([name, value]) => ({
         name,
         value,
-      })
+      }),
     );
 
     // Create data for transaction trend over time
@@ -207,6 +246,50 @@ const DashboardPage = () => {
     toast.info("Export functionality will be implemented soon");
   };
 
+  // Function to send balance notification to a single user
+  const sendBalanceNotification = async (employeeId: string) => {
+    setSendingNotification(true);
+    try {
+      const response =
+        await transactionService.sendBalanceNotification(employeeId);
+      if (response.success) {
+        toast.success(
+          `Balance notification sent to user with ID ${employeeId}`,
+        );
+      } else {
+        toast.error("Failed to send balance notification");
+      }
+    } catch (error) {
+      console.error("Error sending balance notification:", error);
+      toast.error("Failed to send balance notification");
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  // Function to send balance notifications to all users
+  const sendAllBalanceNotifications = async () => {
+    setSendingNotification(true);
+    try {
+      const response = await transactionService.sendAllBalanceNotifications();
+      if (response.success) {
+        toast.success("Balance notifications sent to all users");
+      } else {
+        toast.error("Failed to send balance notifications to all users");
+      }
+    } catch (error) {
+      console.error("Error sending all balance notifications:", error);
+      toast.error("Failed to send balance notifications to all users");
+    } finally {
+      setSendingNotification(false);
+    }
+  };
+
+  const showUserTransactions = (userId: string) => {
+    setSelectedUserId(userId);
+    setOpenTransactionsDialog(true);
+  };
+
   return (
     <div className="container mx-auto p-4 space-y-6">
       <div className="flex justify-between items-center">
@@ -218,7 +301,7 @@ const DashboardPage = () => {
                 variant={"outline"}
                 className={cn(
                   "w-[240px] pl-3 text-left font-normal",
-                  !dateRange && "text-muted-foreground"
+                  !dateRange && "text-muted-foreground",
                 )}
               >
                 {dateRange.from ? (
@@ -470,46 +553,148 @@ const DashboardPage = () => {
 
       {/* Users with Outstanding Balances */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Employee Account Balances</CardTitle>
+          {admin && (
+            <Button
+              onClick={sendAllBalanceNotifications}
+              disabled={sendingNotification || !whatsappStatus?.connected}
+              className="flex items-center gap-2"
+            >
+              {sendingNotification ? (
+                "Sending..."
+              ) : (
+                <>
+                  <Send className="h-4 w-4" /> Send All Balances
+                </>
+              )}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
+          {/* Search input */}
+          <div className="flex items-end py-4">
+            <div className="relative w-full max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by Name, Department or ID..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-8"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-0 top-0 h-full px-3 py-2"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Clear search</span>
+                </Button>
+              )}
+            </div>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Employee ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Balance</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {userBalances
-                .filter((user) => user.balance !== 0)
-                .sort((a, b) => a.balance - b.balance)
-                .map((user) => (
-                  <TableRow key={user.user_id}>
-                    <TableCell className="font-medium">
-                      {user.employee_id}
-                    </TableCell>
-                    <TableCell>{user.user_name}</TableCell>
-                    <TableCell>{user.user_department}</TableCell>
-                    <TableCell
-                      className={
-                        user.balance >= 0 ? "text-green-600" : "text-red-600"
-                      }
-                    >
-                      ₨ {Math.abs(user.balance).toFixed(2)}
-                      <span className="ml-1 text-xs text-gray-500">
-                        {user.balance < 0 ? "(owes canteen)" : "(canteen owes)"}
-                      </span>
-                    </TableCell>
-                  </TableRow>
-                ))}
+              {filteredBalances.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    No matching balances found.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredBalances
+                  .sort((a, b) => a.balance - b.balance)
+                  .map((user) => (
+                    <TableRow key={user.user_id}>
+                      <TableCell>{user.user_name}</TableCell>
+                      <TableCell>{user.user_department}</TableCell>
+                      <TableCell
+                        className={
+                          user.balance >= 0 ? "text-green-600" : "text-red-600"
+                        }
+                      >
+                        ₨ {Math.abs(user.balance).toFixed(2)}
+                        <span className="ml-1 text-xs text-gray-500">
+                          {user.balance < 0
+                            ? "(owes canteen)"
+                            : "(canteen owes)"}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              showUserTransactions(user.employee_id)
+                            }
+                            className="h-8 w-8 p-0"
+                            title="View Transactions"
+                          >
+                            <CreditCardIcon className="h-4 w-4" />
+                            <span className="sr-only">View Transactions</span>
+                          </Button>
+                          {admin && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                sendBalanceNotification(user.employee_id)
+                              }
+                              disabled={
+                                sendingNotification ||
+                                !whatsappStatus?.connected ||
+                                !user.user_phone
+                              }
+                              className="h-8 w-8 p-0"
+                              title="Send Balance Notification"
+                            >
+                              <Send className="h-4 w-4" />
+                              <span className="sr-only">
+                                Send Balance Notification
+                              </span>
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* User Transactions Dialog */}
+      <Dialog
+        open={openTransactionsDialog}
+        onOpenChange={setOpenTransactionsDialog}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>User Transactions</DialogTitle>
+            <DialogDescription>
+              Transactions for the selected user
+            </DialogDescription>
+          </DialogHeader>
+          {selectedUserId && (
+            <UserTransactions
+              userId={selectedUserId}
+              onClose={() => setOpenTransactionsDialog(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
