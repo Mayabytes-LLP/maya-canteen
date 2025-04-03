@@ -86,7 +86,7 @@ func (r *ProductRepository) Create(product *models.Product) error {
 			created_at,
 			updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	now := time.Now()
 	result, err := r.db.Exec(
