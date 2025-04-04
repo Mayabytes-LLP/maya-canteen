@@ -601,6 +601,7 @@ const DashboardPage = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Department</TableHead>
                 <TableHead>Balance</TableHead>
+                <TableHead>Last Notification</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -629,6 +630,11 @@ const DashboardPage = () => {
                             ? "(owes canteen)"
                             : "(canteen owes)"}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        {user.last_notification
+                          ? `Last notification: ${user.last_notification}`
+                          : "No notification sent"}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">

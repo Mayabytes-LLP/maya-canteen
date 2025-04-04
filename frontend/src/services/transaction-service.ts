@@ -435,10 +435,10 @@ export const transactionService = {
     }
   },
 
-  // default limit 10
+  // default limit 50
   async getTransactionsByUserId(
     userId: string,
-    limit = 10,
+    limit = 50,
   ): Promise<EmployeeTransaction[]> {
     // make sure number is 5 digits
     const paddedId = userId.padStart(5, "0");

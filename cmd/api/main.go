@@ -74,7 +74,7 @@ func setupZKDevice(eventLogger *logStd.Logger) *gozk.ZK {
 				continue
 			}
 			log.Info("ZK Device Connected")
-			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]any{
 				"status": "connected",
 			})
 
@@ -82,7 +82,7 @@ func setupZKDevice(eventLogger *logStd.Logger) *gozk.ZK {
 			go func() {
 				for {
 					time.Sleep(3 * time.Second)
-					routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+					routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]any{
 						"status": "connected",
 					})
 				}
@@ -93,7 +93,7 @@ func setupZKDevice(eventLogger *logStd.Logger) *gozk.ZK {
 				if event.UserID != "" {
 					log.Infof("[WebSocket] Broadcasting attendance event - UserID: %v, Time: %v", event.UserID, event.AttendedAt)
 					eventLogger.Printf("Event: %v", event)
-					routes.GlobalWebSocketHandler.Broadcast("attendance_event", map[string]interface{}{
+					routes.GlobalWebSocketHandler.Broadcast("attendance_event", map[string]any{
 						"user_id":   event.UserID,
 						"timestamp": event.AttendedAt.Format(time.RFC3339),
 					})
@@ -101,7 +101,7 @@ func setupZKDevice(eventLogger *logStd.Logger) *gozk.ZK {
 			}
 
 			log.Info("ZK Device disconnected. Retrying in 3 seconds...")
-			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]interface{}{
+			routes.GlobalWebSocketHandler.Broadcast("device_status", map[string]any{
 				"status": "disconnected",
 			})
 			time.Sleep(3 * time.Second)
@@ -121,33 +121,33 @@ func setupLogFile(filename string) (*os.File, error) {
 }
 
 // minimal event handler that only processes connection-related events
-func eventHandler(evt interface{}) {
+func eventHandler(evt any) {
 	switch v := evt.(type) {
 	case *events.Connected:
 		// Connected to WhatsApp
 		log.Info("Connected to WhatsApp")
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
 			"status":  "connected",
 			"message": "WhatsApp connected successfully",
 		})
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]any{
 			"qr_code_base64": "",
 			"logged_in":      true,
 		})
 	case *events.LoggedOut:
 		// Logged out from WhatsApp
 		log.Info("Logged out from WhatsApp")
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
 			"message": "WhatsApp logged out",
 		})
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]any{
 			"qr_code_base64": "",
 			"logged_in":      false,
 		})
 	case *events.StreamReplaced:
 		log.Info("WhatsApp connected from another location")
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
 			"message": "WhatsApp connected from another location",
 		})
@@ -156,9 +156,8 @@ func eventHandler(evt interface{}) {
 	}
 }
 
-func setupWhatsapp() *whatsmeow.Client {
-	dbLog := waLog.Stdout("Database", "INFO", true)
-	// Use a more reliable database path
+func getWhatsappPath() string {
+	// Check if the path is set in the environment variable
 	dbPath, err := filepath.Abs("./whatsapp-store.db")
 	if err != nil {
 		log.Errorf("Error getting absolute path: %v, using default", err)
@@ -172,6 +171,14 @@ func setupWhatsapp() *whatsmeow.Client {
 			dbPath = fmt.Sprintf("file:%s?_foreign_keys=on", dbPath)
 		}
 	}
+
+	return dbPath
+}
+
+func setupWhatsapp() *whatsmeow.Client {
+	dbLog := waLog.Stdout("Database", "INFO", true)
+	// Use a more reliable database path
+	dbPath := getWhatsappPath()
 
 	log.Infof("Using WhatsApp database at: %s", dbPath)
 	container, err := sqlstore.New("sqlite3", dbPath, dbLog)
@@ -200,11 +207,11 @@ func setupWhatsapp() *whatsmeow.Client {
 	})
 
 	// Initialize with disconnected status - we'll connect only on demand
-	routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
 		"status":  "disconnected",
 		"message": "WhatsApp initialized but not connected",
 	})
-	routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]interface{}{
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]any{
 		"qr_code_base64": "",
 		"logged_in":      false,
 	})
@@ -213,14 +220,14 @@ func setupWhatsapp() *whatsmeow.Client {
 	if client.Store.ID != nil {
 		log.Info("WhatsApp credentials found")
 		// Inform the frontend that credentials exist
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
 			"message": "WhatsApp credentials found, click refresh to connect",
 		})
 	} else {
 		// No credentials, inform the frontend
 		log.Info("No WhatsApp credentials found")
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]interface{}{
+		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
 			"message": "No WhatsApp credentials found, click refresh to get QR code",
 		})
@@ -247,6 +254,13 @@ func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whats
 
 	whatsapp.Disconnect()
 	log.Infoln("WhatsApp client disconnected")
+
+	fileDeleted := getWhatsappPath()
+	deleteErr := os.Remove(fileDeleted)
+	if deleteErr != nil {
+		log.Infof("Error deleting WhatsApp store file: %v", deleteErr)
+	}
+	log.Infof("WhatsApp store file deleted: %s", fileDeleted)
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
