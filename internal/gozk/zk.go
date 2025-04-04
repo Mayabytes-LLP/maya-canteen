@@ -212,7 +212,7 @@ func (zk *ZK) GetZktecoUsers() ([]*User, error) {
 		size      int
 		totalSize int
 		users     = make([]*User, 0)
-		v         []interface{}
+		v         []any
 	)
 
 	if records, err = zk.readSize(); err != nil {
@@ -435,7 +435,7 @@ func (zk *ZK) LiveCapture(newTimeout time.Duration) (chan *Attendance, error) {
 				}
 
 				for len(data) >= 12 {
-					unpack := []interface{}{}
+					unpack := []any{}
 
 					if len(data) == 12 {
 						unpack = mustUnpack([]string{"I", "B", "B", "6s"}, data)
@@ -521,7 +521,7 @@ func (zk *ZK) SetTime(t time.Time) error {
 	truncatedTime := t.Truncate(time.Second)
 	log.Println("Set new time:", truncatedTime)
 
-	commandString, err := newBP().Pack([]string{"I"}, []interface{}{zk.encodeTime(truncatedTime)})
+	commandString, err := newBP().Pack([]string{"I"}, []any{zk.encodeTime(truncatedTime)})
 	if err != nil {
 		return err
 	}

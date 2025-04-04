@@ -50,7 +50,7 @@ func New(err error, message string, code string) *AppError {
 }
 
 // Newf creates a new AppError with formatted message
-func Newf(err error, code string, format string, args ...interface{}) *AppError {
+func Newf(err error, code string, format string, args ...any) *AppError {
 	log.Error(err)
 	return &AppError{
 		Err:     err,
@@ -60,7 +60,7 @@ func Newf(err error, code string, format string, args ...interface{}) *AppError 
 }
 
 // NotFound creates a new not found error
-func NotFound(resource string, id interface{}) *AppError {
+func NotFound(resource string, id any) *AppError {
 	log.Error(ErrNotFound)
 	return &AppError{
 		Err:     ErrNotFound,
@@ -102,6 +102,6 @@ func Is(err, target error) bool {
 }
 
 // As sets the target to the error value if it is of the same type
-func As(err error, target interface{}) bool {
+func As(err error, target any) bool {
 	return errors.As(err, target)
 }

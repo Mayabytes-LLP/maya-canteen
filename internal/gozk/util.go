@@ -26,12 +26,12 @@ func newBP() *binarypack.BinaryPack {
 	return &binarypack.BinaryPack{}
 }
 
-func createCheckSum(p []interface{}) ([]byte, error) {
+func createCheckSum(p []any) ([]byte, error) {
 	l := len(p)
 	checksum := 0
 
 	for l > 1 {
-		pack, err := newBP().Pack([]string{"B", "B"}, []interface{}{p[0], p[1]})
+		pack, err := newBP().Pack([]string{"B", "B"}, []any{p[0], p[1]})
 		if err != nil {
 			return nil, err
 		}
@@ -64,11 +64,11 @@ func createCheckSum(p []interface{}) ([]byte, error) {
 		checksum += USHRT_MAX
 	}
 
-	return newBP().Pack([]string{"H"}, []interface{}{checksum})
+	return newBP().Pack([]string{"H"}, []any{checksum})
 }
 
 func createHeader(command int, commandString []byte, sessionID int, replyID int) ([]byte, error) {
-	buf, err := newBP().Pack([]string{"H", "H", "H", "H"}, []interface{}{command, 0, sessionID, replyID})
+	buf, err := newBP().Pack([]string{"H", "H", "H", "H"}, []any{command, 0, sessionID, replyID})
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func createHeader(command int, commandString []byte, sessionID int, replyID int)
 		replyID -= USHRT_MAX
 	}
 
-	packData, err := newBP().Pack([]string{"H", "H", "H", "H"}, []interface{}{command, checksum, sessionID, replyID})
+	packData, err := newBP().Pack([]string{"H", "H", "H", "H"}, []any{command, checksum, sessionID, replyID})
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +112,7 @@ func createHeader(command int, commandString []byte, sessionID int, replyID int)
 }
 
 func createTCPTop(packet []byte) ([]byte, error) {
-	top, err := newBP().Pack([]string{"H", "H", "I"}, []interface{}{MACHINE_PREPARE_DATA_1, MACHINE_PREPARE_DATA_2, len(packet)})
+	top, err := newBP().Pack([]string{"H", "H", "I"}, []any{MACHINE_PREPARE_DATA_1, MACHINE_PREPARE_DATA_2, len(packet)})
 	if err != nil {
 		return nil, err
 	}
@@ -152,10 +152,10 @@ func makeCommKey(key, sessionID int, ticks int) ([]byte, error) {
 
 	k += sessionID
 
-	pack, _ := newBP().Pack([]string{"I"}, []interface{}{k})
+	pack, _ := newBP().Pack([]string{"I"}, []any{k})
 	unpack := mustUnpack([]string{"B", "B", "B", "B"}, pack)
 
-	pack, _ = newBP().Pack([]string{"B", "B", "B", "B"}, []interface{}{
+	pack, _ = newBP().Pack([]string{"B", "B", "B", "B"}, []any{
 		unpack[0].(int) ^ int('Z'),
 		unpack[1].(int) ^ int('K'),
 		unpack[2].(int) ^ int('S'),
@@ -163,11 +163,11 @@ func makeCommKey(key, sessionID int, ticks int) ([]byte, error) {
 	})
 
 	unpack = mustUnpack([]string{"H", "H"}, pack)
-	pack, _ = newBP().Pack([]string{"H", "H"}, []interface{}{unpack[0], unpack[1]})
+	pack, _ = newBP().Pack([]string{"H", "H"}, []any{unpack[0], unpack[1]})
 
 	b := 0xff & ticks
 	unpack = mustUnpack([]string{"B", "B", "B", "B"}, pack)
-	pack, _ = newBP().Pack([]string{"B", "B", "B", "B"}, []interface{}{
+	pack, _ = newBP().Pack([]string{"B", "B", "B", "B"}, []any{
 		unpack[0].(int) ^ b,
 		unpack[1].(int) ^ b,
 		b,
@@ -177,7 +177,7 @@ func makeCommKey(key, sessionID int, ticks int) ([]byte, error) {
 	return pack, nil
 }
 
-func unpack(pad []string, data []byte) ([]interface{}, error) {
+func unpack(pad []string, data []byte) ([]any, error) {
 	value, err := newBP().UnPack(pad, data)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func unpack(pad []string, data []byte) ([]interface{}, error) {
 	return value, nil
 }
 
-func mustUnpack(pad []string, data []byte) []interface{} {
+func mustUnpack(pad []string, data []byte) []any {
 	value, err := unpack(pad, data)
 	if err != nil {
 		panic(err)

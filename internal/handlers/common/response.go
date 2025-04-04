@@ -10,11 +10,11 @@ import (
 type Response struct {
 	Status  string      `json:"status"`
 	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
+	Data    any `json:"data,omitempty"`
 }
 
 // RespondWithJSON writes a JSON response with the given status code and payload
-func RespondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
+func RespondWithJSON(w http.ResponseWriter, code int, payload any) {
 	response := Response{
 		Status: "success",
 		Data:   payload,
@@ -38,7 +38,7 @@ func RespondWithError(w http.ResponseWriter, code int, message string) {
 }
 
 // RespondWithSuccess writes a JSON success response with a message
-func RespondWithSuccess(w http.ResponseWriter, code int, data interface{}) {
+func RespondWithSuccess(w http.ResponseWriter, code int, data any) {
 	RespondWithJSON(w, code, data)
 }
 

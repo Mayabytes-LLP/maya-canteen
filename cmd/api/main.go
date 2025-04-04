@@ -156,32 +156,37 @@ func eventHandler(evt any) {
 	}
 }
 
-func getWhatsappPath() string {
-	// Check if the path is set in the environment variable
-	dbPath, err := filepath.Abs("./whatsapp-store.db")
+// Updated to return both the database URI for SQLite and the actual file path
+func getWhatsappPath() (dbUri string, filePath string) {
+	// Get absolute path to the database file
+	absPath, err := filepath.Abs("./whatsapp-store.db")
 	if err != nil {
 		log.Errorf("Error getting absolute path: %v, using default", err)
-		dbPath = "file:whatsapp-store.db?_foreign_keys=on"
-	} else {
-		// Ensure cross-platform compatibility for file URI
-		if os.PathSeparator == '\\' {
-			// Windows requires a leading slash for file URIs
-			dbPath = fmt.Sprintf("file:/%s?_foreign_keys=on", filepath.ToSlash(dbPath))
-		} else {
-			dbPath = fmt.Sprintf("file:%s?_foreign_keys=on", dbPath)
-		}
+		return "file:whatsapp-store.db?_foreign_keys=on", "whatsapp-store.db"
 	}
 
-	return dbPath
+	// Store the actual file path for later deletion
+	filePath = absPath
+
+	// Create the database URI with proper format for SQLite
+	if os.PathSeparator == '\\' {
+		// Windows requires a leading slash for file URIs
+		dbUri = fmt.Sprintf("file:/%s?_foreign_keys=on", filepath.ToSlash(absPath))
+	} else {
+		dbUri = fmt.Sprintf("file:%s?_foreign_keys=on", absPath)
+	}
+
+	return dbUri, filePath
 }
 
-func setupWhatsapp() *whatsmeow.Client {
+func setupWhatsapp() (*whatsmeow.Client, string) {
 	dbLog := waLog.Stdout("Database", "INFO", true)
-	// Use a more reliable database path
-	dbPath := getWhatsappPath()
 
-	log.Infof("Using WhatsApp database at: %s", dbPath)
-	container, err := sqlstore.New("sqlite3", dbPath, dbLog)
+	// Get both the database URI and file path
+	dbUri, filePath := getWhatsappPath()
+
+	log.Infof("Using WhatsApp database at: %s", filePath)
+	container, err := sqlstore.New("sqlite3", dbUri, dbLog)
 	if err != nil {
 		log.Infof("Failed to connect to WhatsApp database: %v", err)
 		panic(err)
@@ -194,8 +199,9 @@ func setupWhatsapp() *whatsmeow.Client {
 		panic(err)
 	}
 
+	clientLog := waLog.Stdout("whatapp client", "DEBUG", true)
 	// Create client with specific options to disable history sync
-	client := whatsmeow.NewClient(deviceStore, nil)
+	client := whatsmeow.NewClient(deviceStore, clientLog)
 
 	// Only add event handler for essential events (connection status)
 	client.AddEventHandler(eventHandler)
@@ -203,6 +209,23 @@ func setupWhatsapp() *whatsmeow.Client {
 	// Register the WhatsApp client with the WebSocket handler for refresh capability
 	routes.GlobalWebSocketHandler.SetWhatsAppClient(client)
 	routes.GlobalWebSocketHandler.RegisterQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
+		// Check if we already have credentials
+		if client.Store.ID != nil {
+			log.Info("WhatsApp credentials found")
+			// Inform the frontend that credentials exist
+			routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
+				"status":  "disconnected",
+				"message": "WhatsApp credentials found, click refresh to connect",
+			})
+		} else {
+			// No credentials, inform the frontend
+			log.Info("No WhatsApp credentials found")
+			routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
+				"status":  "disconnected",
+				"message": "No WhatsApp credentials found, click refresh to get QR code",
+			})
+		}
+
 		return client.GetQRChannel(ctx)
 	})
 
@@ -216,27 +239,10 @@ func setupWhatsapp() *whatsmeow.Client {
 		"logged_in":      false,
 	})
 
-	// Check if we already have credentials
-	if client.Store.ID != nil {
-		log.Info("WhatsApp credentials found")
-		// Inform the frontend that credentials exist
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
-			"status":  "disconnected",
-			"message": "WhatsApp credentials found, click refresh to connect",
-		})
-	} else {
-		// No credentials, inform the frontend
-		log.Info("No WhatsApp credentials found")
-		routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
-			"status":  "disconnected",
-			"message": "No WhatsApp credentials found, click refresh to get QR code",
-		})
-	}
-
-	return client
+	return client, filePath
 }
 
-func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whatsmeow.Client, done chan bool) {
+func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whatsmeow.Client, whatsappDbPath string, done chan bool) {
 	// Create context that listens for the interrupt signal from the OS.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -246,31 +252,57 @@ func gracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whats
 
 	log.Infoln("Shutting down gracefully, press Ctrl+C again to force")
 
+	// Stop ZK device
+	log.Infoln("Stopping ZK device capture...")
 	zkSocket.StopCapture()
 	log.Infoln("ZK device capture stopped")
 
+	log.Infoln("Disconnecting ZK device...")
 	zkSocket.Disconnect()
 	log.Infoln("ZK device disconnected")
 
+	// Properly log out from WhatsApp if connected
+	if whatsapp.IsConnected() {
+		log.Infoln("Logging out from WhatsApp...")
+		err := whatsapp.Logout()
+		if err != nil {
+			log.Errorf("Error logging out from WhatsApp: %v", err)
+		} else {
+			log.Infoln("WhatsApp logout successful")
+		}
+	}
+
+	log.Infoln("Disconnecting WhatsApp client...")
 	whatsapp.Disconnect()
 	log.Infoln("WhatsApp client disconnected")
 
-	fileDeleted := getWhatsappPath()
-	deleteErr := os.Remove(fileDeleted)
-	if deleteErr != nil {
-		log.Infof("Error deleting WhatsApp store file: %v", deleteErr)
+	// Delete WhatsApp database file using the path we stored during setup
+	log.Infof("Attempting to delete WhatsApp store file: %s", whatsappDbPath)
+
+	if _, err := os.Stat(whatsappDbPath); err == nil {
+		deleteErr := os.Remove(whatsappDbPath)
+		if deleteErr != nil {
+			log.Errorf("Error deleting WhatsApp store file: %v", deleteErr)
+		} else {
+			log.Infof("WhatsApp store file deleted successfully: %s", whatsappDbPath)
+		}
+	} else {
+		log.Infof("WhatsApp store file not found: %s", whatsappDbPath)
 	}
-	log.Infof("WhatsApp store file deleted: %s", fileDeleted)
 
 	// The context is used to inform the server it has 5 seconds to finish
 	// the request it is currently handling
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := apiServer.Shutdown(ctx); err != nil {
+
+	log.Infoln("Shutting down API server...")
+	if err := apiServer.Shutdown(shutdownCtx); err != nil {
 		log.Errorf("Server forced to shutdown with error: %v", err)
+	} else {
+		log.Infoln("API server shutdown gracefully")
 	}
 
-	log.Info("API server shutdown")
+	log.Infoln("Shutdown sequence completed")
 	close(done)
 }
 
@@ -287,10 +319,10 @@ func main() {
 	eventLogger := logStd.New(logFile, "", logStd.LstdFlags)
 	apiServer := server.NewServer()
 	zkSocket := setupZKDevice(eventLogger)
-	whatsapp := setupWhatsapp()
+	whatsapp, whatsappDbPath := setupWhatsapp()
 
 	done := make(chan bool, 1)
-	go gracefulShutdown(apiServer, zkSocket, whatsapp, done)
+	go gracefulShutdown(apiServer, zkSocket, whatsapp, whatsappDbPath, done)
 
 	log.Infoln("Starting API server")
 	if err := apiServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {

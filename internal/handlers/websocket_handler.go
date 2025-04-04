@@ -37,8 +37,8 @@ type WebsocketHandler struct {
 }
 
 type WSMessage struct {
-	Type    string      `json:"type"`
-	Payload interface{} `json:"payload"`
+	Type    string `json:"type"`
+	Payload any    `json:"payload"`
 }
 
 func NewWebSocketHandler(db database.Service) *WebsocketHandler {
@@ -149,7 +149,7 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	if h.whatsappClient == nil {
 		log.Println("WhatsApp client not initialized")
-		h.Broadcast("whatsapp_status", map[string]interface{}{
+		h.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
 			"message": "WhatsApp client not initialized",
 		})
@@ -161,7 +161,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	if h.connectionInProgress {
 		log.Println("WhatsApp connection already in progress, ignoring request")
 		h.mu.Unlock()
-		h.Broadcast("whatsapp_status", map[string]interface{}{
+		h.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
 			"message": "Connection attempt already in progress",
 		})
@@ -186,11 +186,11 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 
 	if h.whatsappClient.IsConnected() {
 		log.Println("WhatsApp is already connected")
-		h.Broadcast("whatsapp_status", map[string]interface{}{
+		h.Broadcast("whatsapp_status", map[string]any{
 			"status":  "connected",
 			"message": "WhatsApp is already connected",
 		})
-		h.Broadcast("whatsapp_qr", map[string]interface{}{
+		h.Broadcast("whatsapp_qr", map[string]any{
 			"qr_code_base64": "",
 			"logged_in":      true,
 		})
@@ -198,7 +198,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	}
 
 	log.Println("Attempting to connect to WhatsApp...")
-	h.Broadcast("whatsapp_status", map[string]interface{}{
+	h.Broadcast("whatsapp_status", map[string]any{
 		"status":  "disconnected",
 		"message": "Connecting to WhatsApp...",
 	})
@@ -210,7 +210,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	go func() {
 		if h.getQRChannel == nil {
 			log.Println("QR channel getter not registered")
-			h.Broadcast("whatsapp_status", map[string]interface{}{
+			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
 				"message": "QR code generation not available",
 			})
@@ -222,11 +222,11 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 		h.qrTimeout = time.AfterFunc(5*time.Minute, func() {
 			log.Println("QR code scanning timed out after 5 minutes")
 			cancel() // Cancel the QR context
-			h.Broadcast("whatsapp_status", map[string]interface{}{
+			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
 				"message": "QR code scanning timed out. Please try again.",
 			})
-			h.Broadcast("whatsapp_qr", map[string]interface{}{
+			h.Broadcast("whatsapp_qr", map[string]any{
 				"qr_code_base64": "",
 				"logged_in":      false,
 			})
@@ -237,7 +237,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 		qrChan, err := h.getQRChannel(ctx)
 		if err != nil {
 			log.Printf("Failed to get QR channel: %v", err)
-			h.Broadcast("whatsapp_status", map[string]interface{}{
+			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
 				"message": "Failed to initialize QR code process: " + err.Error(),
 			})
@@ -247,7 +247,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 		// Now connect - this will generate the QR code if needed
 		if err := h.whatsappClient.Connect(); err != nil {
 			log.Printf("Failed to connect to WhatsApp: %v", err)
-			h.Broadcast("whatsapp_status", map[string]interface{}{
+			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
 				"message": "Connection failed: " + err.Error(),
 			})
@@ -260,7 +260,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			if evt.Event == "code" {
 				qrCodeShown = true
 				log.Println("WhatsApp QR code received, broadcasting to UI")
-				h.Broadcast("whatsapp_qr", map[string]interface{}{
+				h.Broadcast("whatsapp_qr", map[string]any{
 					"qr_code_base64": evt.Code,
 					"logged_in":      false,
 				})
@@ -274,11 +274,11 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 				h.mu.Unlock()
 
 				log.Println("WhatsApp login successful")
-				h.Broadcast("whatsapp_status", map[string]interface{}{
+				h.Broadcast("whatsapp_status", map[string]any{
 					"status":  "connected",
 					"message": "WhatsApp login successful",
 				})
-				h.Broadcast("whatsapp_qr", map[string]interface{}{
+				h.Broadcast("whatsapp_qr", map[string]any{
 					"qr_code_base64": "",
 					"logged_in":      true,
 				})
@@ -289,7 +289,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 		// If we didn't show a QR code and didn't connect successfully,
 		// inform the user about the issue
 		if !qrCodeShown && !h.whatsappClient.IsConnected() {
-			h.Broadcast("whatsapp_status", map[string]interface{}{
+			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
 				"message": "Could not generate QR code. Please try again later.",
 			})
@@ -297,13 +297,13 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	}()
 }
 
-func (h *WebsocketHandler) Broadcast(msgType string, payload interface{}) {
+func (h *WebsocketHandler) Broadcast(msgType string, payload any) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	// If this is a WhatsApp QR code broadcast, store the latest code
 	if msgType == "whatsapp_qr" {
-		if payloadMap, ok := payload.(map[string]interface{}); ok {
+		if payloadMap, ok := payload.(map[string]any); ok {
 			if qrCode, ok := payloadMap["qr_code_base64"].(string); ok && qrCode != "" {
 				h.latestWhatsappQR = qrCode
 			} else if qrCode == "" {

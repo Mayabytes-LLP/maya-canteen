@@ -64,7 +64,7 @@ func (zk *ZK) GetProperties() (*ZKProperties, error) {
 }
 
 func (zk *ZK) readWithBuffer(command, fct, ext int) ([]byte, int, error) {
-	commandString, err := newBP().Pack([]string{"b", "h", "i", "i"}, []interface{}{1, command, fct, ext})
+	commandString, err := newBP().Pack([]string{"b", "h", "i", "i"}, []any{1, command, fct, ext})
 	if err != nil {
 		return nil, 0, err
 	}
@@ -159,7 +159,7 @@ func (zk *ZK) receiveRawData(size int) ([]byte, error) {
 
 func (zk *ZK) readChunk(start, size int) ([]byte, error) {
 	for range make([]int, 3) {
-		commandString, err := newBP().Pack([]string{"i", "i"}, []interface{}{start, size})
+		commandString, err := newBP().Pack([]string{"i", "i"}, []any{start, size})
 		if err != nil {
 			return nil, err
 		}
@@ -354,7 +354,7 @@ func (zk *ZK) verifyUser() error {
 }
 
 func (zk *ZK) regEvent(flag int) error {
-	commandString, err := newBP().Pack([]string{"I"}, []interface{}{flag})
+	commandString, err := newBP().Pack([]string{"I"}, []any{flag})
 	if err != nil {
 		return err
 	}

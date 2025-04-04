@@ -108,7 +108,7 @@ type Client = whatsmeow.Client
 // 	IsConnected(instance *Instance) bool
 // 	Disconnect(instance *Instance)
 // 	Logout(instance *Instance) error
-// 	EventHandler(instance *Instance, handler func(evt interface{}))
+// 	EventHandler(instance *Instance, handler func(evt any))
 // 	InitInstance(instance *Instance, qrcodeHandler func(evt string, qrcode string, err error)) error
 // 	SendTextMessage(instance *Instance, jid JID, text string) (MessageResponse, error)
 // 	SendAudioMessage(instance *Instance, jid JID, audioURL *dataurl.DataURL, mimitype string) (MessageResponse, error)
@@ -163,7 +163,7 @@ type Client = whatsmeow.Client
 // 	return w.CreateInstance(id)
 // }
 
-// func (w *whatsApp) EventHandler(instance *Instance, handler func(evt interface{})) {
+// func (w *whatsApp) EventHandler(instance *Instance, handler func(evt any)) {
 // 	instance.Client.AddEventHandler(handler)
 // }
 
@@ -568,7 +568,7 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	common.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
+	common.RespondWithJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"message": fmt.Sprintf("Balance notification sent to %s", user.Name),
 	})
@@ -617,10 +617,10 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 		time.Sleep(500 * time.Millisecond)
 	}
 
-	common.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
+	common.RespondWithJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"message": fmt.Sprintf("Sent %d notifications, %d failed", successCount, failCount),
-		"details": map[string]interface{}{
+		"details": map[string]any{
 			"success_count": successCount,
 			"fail_count":    failCount,
 			"failed_users":  failedUsers,

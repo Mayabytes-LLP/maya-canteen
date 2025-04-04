@@ -32,7 +32,7 @@ func (h *BaseHandler) ParseID(vars map[string]string, paramName string) (int64, 
 }
 
 // DecodeJSON decodes JSON from the request body into the given target
-func (h *BaseHandler) DecodeJSON(r *http.Request, target interface{}) error {
+func (h *BaseHandler) DecodeJSON(r *http.Request, target any) error {
 	if err := json.NewDecoder(r.Body).Decode(target); err != nil {
 		return errors.InvalidInput("Invalid JSON: " + err.Error())
 	}

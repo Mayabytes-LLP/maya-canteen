@@ -9,8 +9,8 @@ import (
 type Entity interface {
 	GetID() int64
 	SetID(id int64)
-	SetCreatedAt(timestamp interface{})
-	SetUpdatedAt(timestamp interface{})
+	SetCreatedAt(timestamp any)
+	SetUpdatedAt(timestamp any)
 }
 
 // GenericRepository provides a generic implementation for common repository operations
@@ -104,7 +104,7 @@ func (r *GenericRepository) BuildDeleteQuery(where string) string {
 }
 
 // ScanRows scans rows into a slice of entities using reflection
-func ScanRows(rows *sql.Rows, entityType reflect.Type) (interface{}, error) {
+func ScanRows(rows *sql.Rows, entityType reflect.Type) (any, error) {
 	sliceType := reflect.SliceOf(entityType)
 	slice := reflect.MakeSlice(sliceType, 0, 0)
 
