@@ -8,15 +8,16 @@ type Props = {
   children?: React.ReactNode;
 };
 
+const VITE_WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8080/ws";
 export const AppProvider: FC<Props> = ({ children, ...props }) => {
   const [admin, setAdmin] = useState(initialState.admin);
   const [zkDeviceStatus, setZkDeviceStatus] = useState<boolean>(
-    initialState.zkDeviceStatus
+    initialState.zkDeviceStatus,
   );
   const [currentUser, setCurrentUser] = useState(initialState.currentUser);
   const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState(
-    initialState.whatsappStatus
+    initialState.whatsappStatus,
   );
   const location = useLocation();
   const navigate = useNavigate();
@@ -25,7 +26,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 
   useEffect(() => {
     const connectWebSocket = () => {
-      ws.current = new WebSocket("ws://localhost:8080/ws");
+      ws.current = new WebSocket(VITE_WS_URL);
 
       ws.current.onopen = () => {
         console.log("WebSocket connected");

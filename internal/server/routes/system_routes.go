@@ -34,6 +34,7 @@ func RegisterSystemRoutes(router *mux.Router, db database.Service) {
 func (h *SystemHandlers) HelloWorldHandler(w http.ResponseWriter, r *http.Request) {
 	common.RespondWithSuccess(w, http.StatusOK, map[string]string{
 		"message": "This api works!!!",
+		"canteen": "for ",
 	})
 }
 

@@ -491,12 +491,9 @@ export const transactionService = {
   async sendBalanceNotification(
     employeeId: string,
   ): Promise<{ success: boolean; message?: string }> {
-    const response = await fetch(
-      `${API_BASE}/whatsapp/send-balance/${employeeId}`,
-      {
-        method: "POST",
-      },
-    );
+    const response = await fetch(`${API_BASE}/whatsapp/notify/${employeeId}`, {
+      method: "POST",
+    });
 
     if (!response.ok) {
       const error = await response.json();
