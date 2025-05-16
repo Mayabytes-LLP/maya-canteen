@@ -13,7 +13,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
 	waProto "go.mau.fi/whatsmeow/proto/waE2E"
-	"go.mau.fi/whatsmeow/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -35,8 +34,8 @@ func NewWhatsAppHandler(db database.Service, getClient func() *whatsmeow.Client)
 
 // SendWhatsAppMessage sends a message to a user's WhatsApp number
 func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error {
-	client := h.GetWhatsAppClient()
 	// Check if WhatsApp client is connected
+	client := h.GetWhatsAppClient()
 	if client == nil {
 		return fmt.Errorf("WhatsApp client is not initialized")
 	}
@@ -45,11 +44,20 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 		return fmt.Errorf("WhatsApp client is not connected")
 	}
 
-	// Parse phone number as JID (WhatsApp ID)
-	recipient, err := types.ParseJID(phoneNumber + "@s.whatsapp.net")
+	results, err := h.GetWhatsAppClient().IsOnWhatsApp([]string{phoneNumber})
 	if err != nil {
-		return fmt.Errorf("invalid phone number format: %v", err)
+		return fmt.Errorf("failed to check WhatsApp status: %v", err)
 	}
+	if len(results) == 0 || !results[0].IsIn {
+		log.Warnf("Phone number %s is not on WhatsApp", phoneNumber)
+		return fmt.Errorf("phone number is not on WhatsApp")
+	}
+
+	if len(results) > 1 {
+		log.Warnf("Multiple results for phone number %s: %v", phoneNumber, results)
+		return fmt.Errorf("multiple results for phone number")
+	}
+	recipient := results[0].JID
 
 	log.Infof("Sending WhatsApp message to %s: %s", recipient, message)
 
@@ -74,7 +82,23 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 
 // NotifyUserBalance sends a balance notification to a specific user
 func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Request) {
-	// Extract employee ID from URL params
+
+	if h.GetWhatsAppClient() == nil {
+		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not initialized")
+		return
+	}
+	if !h.GetWhatsAppClient().IsLoggedIn() {
+		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not connected")
+		return
+	}
+
+	connected := h.GetWhatsAppClient().IsConnected()
+	if !connected {
+		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not connected")
+		return
+	}
+	log.Info("WhatsApp client disconnected")
+
 	vars := mux.Vars(r)
 	employeeID, err := h.ParseID(vars, "id")
 	if err != nil {
