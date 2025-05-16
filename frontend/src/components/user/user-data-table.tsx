@@ -95,12 +95,13 @@ export function BalanceTable({
   ) => {
     const currentDate = new Date();
     currentDate.setDate(1);
-    currentDate.setMonth(currentDate.getMonth() - 1);
+    currentDate.setMonth(currentDate.getMonth());
+    // currentDate.setMonth(currentDate.getMonth() - 1);
     const prevMonth = currentDate.toLocaleString("default", { month: "long" });
     const prevYear = currentDate.getFullYear();
     const message = `**Balance Update** \n\nDear ${name},\nYour current canteen balance is: *PKR ${balance.toFixed(
       2
-    )}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) full month ${prevMonth} ${prevYear} of Canteen bill\n\nAfter pay share screenshot\n\nThis is an automated message from Maya Canteen Management System.`;
+    )}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month ${prevMonth} ${prevYear} of Canteen bill\n\nAfter pay share screenshot\n\nThis is an automated message from Maya Canteen Management System.`;
 
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   };
