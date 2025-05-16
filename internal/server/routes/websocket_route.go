@@ -10,9 +10,9 @@ import (
 var GlobalWebSocketHandler *handlers.WebsocketHandler
 
 // RegisterWebSocketRoute registers the WebSocket route
-func RegisterWebSocketRoute(router *mux.Router, db database.Service) {
-	// Create WebSocket handler
-	GlobalWebSocketHandler = handlers.NewWebSocketHandler(db)
+func RegisterWebSocketRoute(router *mux.Router, db database.Service, client handlers.WhatsAppClient) {
+	// Create WebSocket handler with WhatsApp client
+	GlobalWebSocketHandler = handlers.NewWebSocketHandler(db, client)
 
 	// Register WebSocket route directly without subrouter
 	router.HandleFunc("/ws", GlobalWebSocketHandler.Socket)
