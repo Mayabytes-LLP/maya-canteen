@@ -182,6 +182,18 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			"message": "Connecting to WhatsApp with stored credentials...",
 		})
 
+		if h.whatsappClient.IsConnected() {
+			log.Println("WhatsApp login successful (with stored credentials)")
+			h.Broadcast("whatsapp_status", map[string]any{
+				"status":  "connected",
+				"message": "WhatsApp login successful",
+			})
+			h.Broadcast("whatsapp_qr", map[string]any{
+				"qr_code_base64": "",
+				"logged_in":      true,
+			})
+		}
+
 		go func() {
 			if err := h.whatsappClient.Connect(); err != nil {
 				log.Printf("Failed to connect to WhatsApp: %v", err)

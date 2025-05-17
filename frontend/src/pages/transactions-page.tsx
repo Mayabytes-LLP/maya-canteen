@@ -102,9 +102,8 @@ export default function TransactionsPage() {
                 <div className="flex flex-col items-center">
                   <QRCodeSVG
                     value={whatsappQR}
-                    size={240}
+                    size={320}
                     level="H"
-                    includeMargin={true}
                     bgColor="#000"
                     fgColor="#fff"
                     className="p-2 bg-white rounded-md border"
@@ -114,14 +113,7 @@ export default function TransactionsPage() {
                   </p>
                 </div>
               ) : whatsappStatus.connected ? (
-                <div className="text-center p-4">
-                  <p className="text-lg text-green-600 font-medium">
-                    WhatsApp is connected!
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {whatsappStatus.message}
-                  </p>
-                </div>
+                <div className="text-center p-4"></div>
               ) : (
                 <div className="text-center p-4">
                   <p className="text-lg">WhatsApp QR Code not available</p>

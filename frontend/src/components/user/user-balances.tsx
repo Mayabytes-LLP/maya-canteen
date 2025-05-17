@@ -34,7 +34,7 @@ import {
   PopoverTrigger,
 } from "@components/ui/popover";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronsUpDown, MessageCircle } from "lucide-react";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "../ui/button";
@@ -52,6 +52,7 @@ import {
 } from "@/components/ui/form";
 import { AppContext } from "@/context";
 import { BalanceTable } from "./user-data-table";
+import SendAllBalance from "@/components/send-all-banlance";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -78,7 +79,6 @@ export default function UserBalances({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userPopover, setUserPopover] = useState(false);
   const [sendingNotification, setSendingNotification] = useState(false);
-  const [sendingAllNotifications, setSendingAllNotifications] = useState(false);
 
   const { admin, whatsappStatus } = useContext(AppContext);
 
@@ -111,11 +111,15 @@ export default function UserBalances({
   }, [refreshTrigger]);
 
   // Function to send balance notification to a single user
-  const sendBalanceNotification = async (employeeId: string) => {
+  const sendBalanceNotification = async (
+    employeeId: string,
+    messageTemplate?: string
+  ) => {
     setSendingNotification(true);
     try {
       const response = await transactionService.sendBalanceNotification(
-        employeeId
+        employeeId,
+        messageTemplate
       );
       if (response.success) {
         toast.success(
@@ -129,24 +133,6 @@ export default function UserBalances({
       toast.error("Failed to send balance notification");
     } finally {
       setSendingNotification(false);
-    }
-  };
-
-  // Function to send balance notifications to all users
-  const sendAllBalanceNotifications = async () => {
-    setSendingAllNotifications(true);
-    try {
-      const response = await transactionService.sendAllBalanceNotifications();
-      if (response.success) {
-        toast.success("Balance notifications sent to all users");
-      } else {
-        toast.error("Failed to send balance notifications to all users");
-      }
-    } catch (error) {
-      console.error("Error sending all balance notifications:", error);
-      toast.error("Failed to send balance notifications to all users");
-    } finally {
-      setSendingAllNotifications(false);
     }
   };
 
@@ -262,21 +248,7 @@ export default function UserBalances({
     <Card className="w-full">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>User's Balance</CardTitle>
-        {admin && (
-          <Button
-            onClick={sendAllBalanceNotifications}
-            disabled={sendingAllNotifications || !whatsappStatus.connected}
-            className="flex items-center gap-2"
-          >
-            {sendingAllNotifications ? (
-              "Sending..."
-            ) : (
-              <>
-                <MessageCircle className="h-4 w-4" /> Send All Balances
-              </>
-            )}
-          </Button>
-        )}
+        {admin && <SendAllBalance />}
       </CardHeader>
       <CardContent>
         {loading ? (

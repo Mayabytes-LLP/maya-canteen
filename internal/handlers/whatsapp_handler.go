@@ -2,11 +2,13 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/handlers/common"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -82,7 +84,6 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 
 // NotifyUserBalance sends a balance notification to a specific user
 func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Request) {
-
 	if h.GetWhatsAppClient() == nil {
 		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not initialized")
 		return
@@ -126,11 +127,22 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	message := fmt.Sprintf(
-		"**Balance Update** \n\nDear %s,\nYour current canteen balance is: *PKR %.2f*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System.",
-		user.Name,
-		float64(userBalance.Balance), // Assuming 'Amount' is the numeric field in models.UserBalance
-	)
+	// Parse message_template from POST body
+	type reqBody struct {
+		MessageTemplate string `json:"message_template"`
+	}
+	var body reqBody
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	messageTemplate := body.MessageTemplate
+	if messageTemplate == "" {
+		messageTemplate = "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System."
+	}
+
+	// Replace placeholders
+	message := messageTemplate
+	message = strings.ReplaceAll(message, "{name}", user.Name)
+	message = strings.ReplaceAll(message, "{balance}", fmt.Sprintf("%.2f", float64(userBalance.Balance)))
 
 	log.Infof("Sending WhatsApp message to %s: %s", user.Phone, message)
 
@@ -150,6 +162,18 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 
 // NotifyAllUsersBalances sends balance notifications to all users
 func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.Request) {
+	// Parse message_template from POST body
+	type reqBody struct {
+		MessageTemplate string `json:"message_template"`
+	}
+	var body reqBody
+	_ = json.NewDecoder(r.Body).Decode(&body)
+
+	messageTemplate := body.MessageTemplate
+	if messageTemplate == "" {
+		messageTemplate = "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System."
+	}
+
 	// Get all users with balances
 	userBalances, err := h.DB.GetUsersBalances()
 	if err != nil {
@@ -170,12 +194,10 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 			continue
 		}
 
-		// Format message
-		message := fmt.Sprintf(
-			"**Balance Update** \n\nDear %s,\nYour current canteen balance is: *PKR %.2f*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System.",
-			balance.UserName,
-			balance.Balance,
-		)
+		// Replace placeholders
+		message := messageTemplate
+		message = strings.ReplaceAll(message, "{name}", balance.UserName)
+		message = strings.ReplaceAll(message, "{balance}", fmt.Sprintf("%.2f", balance.Balance))
 
 		// Send message
 		err = h.SendWhatsAppMessage(balance.Phone, message)
