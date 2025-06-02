@@ -3,6 +3,7 @@ package routes
 import (
 	"maya-canteen/frontend"
 	"maya-canteen/internal/database"
+	"maya-canteen/internal/handlers"
 	"maya-canteen/internal/middleware"
 	"net/http"
 
@@ -11,14 +12,14 @@ import (
 )
 
 // RegisterRoutes registers all routes for the application
-func RegisterRoutes(db database.Service) http.Handler {
+func RegisterRoutes(db database.Service, whatsappClient handlers.WhatsAppClient) http.Handler {
 	// Initialize database tables
 	initDatabaseTables(db)
 
 	// Create main router
 	router := mux.NewRouter()
 
-	RegisterWebSocketRoute(router, db)
+	RegisterWebSocketRoute(router, db, whatsappClient)
 
 	// Create HTTP router with middleware
 	RegisterSystemRoutes(router, db)

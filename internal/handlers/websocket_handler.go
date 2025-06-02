@@ -41,7 +41,7 @@ type WSMessage struct {
 	Payload any    `json:"payload"`
 }
 
-func NewWebSocketHandler(db database.Service) *WebsocketHandler {
+func NewWebSocketHandler(db database.Service, client WhatsAppClient) *WebsocketHandler {
 	return &WebsocketHandler{
 		BaseHandler: common.NewBaseHandler(db),
 		upgrader: websocket.Upgrader{
@@ -53,20 +53,8 @@ func NewWebSocketHandler(db database.Service) *WebsocketHandler {
 		},
 		clients:              make(map[*websocket.Conn]bool),
 		connectionInProgress: false,
+		whatsappClient:       client,
 	}
-}
-
-// SetWhatsAppClient allows the main app to set the WhatsApp client for interaction
-func (h *WebsocketHandler) SetWhatsAppClient(client WhatsAppClient) {
-	h.whatsappClient = client
-}
-
-// GetWhatsAppClient returns the WhatsApp client for use by other handlers
-func (h *WebsocketHandler) GetWhatsAppClient() *whatsmeow.Client {
-	if client, ok := h.whatsappClient.(*whatsmeow.Client); ok {
-		return client
-	}
-	return nil
 }
 
 // RegisterQRChannelGetter sets the function to get a QR channel
@@ -183,6 +171,61 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 		h.connectionInProgress = false
 		h.mu.Unlock()
 	}()
+
+	// --- NEW LOGIC: If WhatsApp credentials are stored, connect directly ---
+	client := h.GetWhatsAppClient()
+	if client != nil && client.Store.ID != nil {
+		// Credentials are stored, try to connect directly
+		log.Println("WhatsApp credentials found, connecting directly...")
+		h.Broadcast("whatsapp_status", map[string]any{
+			"status":  "connecting",
+			"message": "Connecting to WhatsApp with stored credentials...",
+		})
+
+		if h.whatsappClient.IsConnected() {
+			log.Println("WhatsApp login successful (with stored credentials)")
+			h.Broadcast("whatsapp_status", map[string]any{
+				"status":  "connected",
+				"message": "WhatsApp login successful",
+			})
+			h.Broadcast("whatsapp_qr", map[string]any{
+				"qr_code_base64": "",
+				"logged_in":      true,
+			})
+		}
+
+		go func() {
+			if err := h.whatsappClient.Connect(); err != nil {
+				log.Printf("Failed to connect to WhatsApp: %v", err)
+				h.Broadcast("whatsapp_status", map[string]any{
+					"status":  "disconnected",
+					"message": "Connection failed: " + err.Error(),
+				})
+				return
+			}
+			// Wait a moment for connection to establish
+			time.Sleep(2 * time.Second)
+			if h.whatsappClient.IsConnected() {
+				log.Println("WhatsApp login successful (with stored credentials)")
+				h.Broadcast("whatsapp_status", map[string]any{
+					"status":  "connected",
+					"message": "WhatsApp login successful",
+				})
+				h.Broadcast("whatsapp_qr", map[string]any{
+					"qr_code_base64": "",
+					"logged_in":      true,
+				})
+			} else {
+				log.Println("WhatsApp connection failed (with stored credentials)")
+				h.Broadcast("whatsapp_status", map[string]any{
+					"status":  "disconnected",
+					"message": "Failed to connect with stored credentials. Please try again.",
+				})
+			}
+		}()
+		return
+	}
+	// --- END NEW LOGIC ---
 
 	if h.whatsappClient.IsConnected() {
 		log.Println("WhatsApp is already connected")
@@ -347,4 +390,11 @@ func (h *WebsocketHandler) Cleanup() {
 		h.qrTimeout.Stop()
 		h.qrTimeout = nil
 	}
+}
+
+func (h *WebsocketHandler) GetWhatsAppClient() *whatsmeow.Client {
+	if client, ok := h.whatsappClient.(*whatsmeow.Client); ok {
+		return client
+	}
+	return nil
 }

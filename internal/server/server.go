@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"maya-canteen/internal/database"
+	"maya-canteen/internal/handlers"
 	"maya-canteen/internal/server/routes"
 	"net/http"
 	"os"
@@ -19,7 +20,7 @@ type Server struct {
 }
 
 // NewServer creates a new server instance
-func NewServer() *http.Server {
+func NewServer(whatsappClient handlers.WhatsAppClient) *http.Server {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	if port == 0 {
 		port = 8080 // Default port
@@ -34,7 +35,7 @@ func NewServer() *http.Server {
 	// Declare Server config
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
-		Handler:      routes.RegisterRoutes(s.db),
+		Handler:      routes.RegisterRoutes(s.db, whatsappClient),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,

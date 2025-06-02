@@ -1,3 +1,4 @@
+import SendAllBalance from "@/components/send-all-banlance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import UserTransactions from "@/components/user/user-transactions";
+import { WhatsAppNotificationDialog } from "@/components/whatsapp-notification-dialog";
 import { AppContext } from "@/context";
 import { cn } from "@/lib/utils";
 import {
@@ -74,6 +76,10 @@ const DashboardPage = () => {
   const [openTransactionsDialog, setOpenTransactionsDialog] = useState(false);
   const [sendingNotification, setSendingNotification] = useState(false);
   const { admin, whatsappStatus } = useContext(AppContext);
+  const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(
+    null
+  );
 
   // Filtered balances based on search query
   const filteredBalances = userBalances.filter(
@@ -84,7 +90,7 @@ const DashboardPage = () => {
         user.user_department
           .toLowerCase()
           .includes(searchQuery.toLowerCase()) ||
-        user.employee_id.toLowerCase().includes(searchQuery.toLowerCase())),
+        user.employee_id.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   // Calculated summary values
@@ -126,15 +132,16 @@ const DashboardPage = () => {
       console.log("User balances:", balancesData);
 
       // Get latest transactions
-      const latestTransactions =
-        await transactionService.getLatestTransactions(5);
+      const latestTransactions = await transactionService.getLatestTransactions(
+        5
+      );
       console.log("Latest transactions:", latestTransactions);
 
       // Process the data for summaries
       processData(
         transactionsData ?? [],
         balancesData ?? [],
-        latestTransactions ?? [],
+        latestTransactions ?? []
       );
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
@@ -154,7 +161,7 @@ const DashboardPage = () => {
   const processData = (
     transactionsData: Transaction[],
     balancesData: UserBalance[],
-    latestTransactions: Transaction[],
+    latestTransactions: Transaction[]
   ) => {
     // Calculate total received (deposits) and owed (negative balances)
     const totalReceived = transactionsData
@@ -176,23 +183,20 @@ const DashboardPage = () => {
       .reduce((sum, user) => sum + user.balance, 0);
 
     // Group transactions by type
-    const typeGroups = transactionsData.reduce(
-      (groups, transaction) => {
-        const type = transaction.transaction_type;
-        if (!groups[type]) {
-          groups[type] = 0;
-        }
-        groups[type] += Math.abs(transaction.amount);
-        return groups;
-      },
-      {} as Record<string, number>,
-    );
+    const typeGroups = transactionsData.reduce((groups, transaction) => {
+      const type = transaction.transaction_type;
+      if (!groups[type]) {
+        groups[type] = 0;
+      }
+      groups[type] += Math.abs(transaction.amount);
+      return groups;
+    }, {} as Record<string, number>);
 
     const transactionsByType = Object.entries(typeGroups).map(
       ([name, value]) => ({
         name,
         value,
-      }),
+      })
     );
 
     // Create data for transaction trend over time
@@ -247,39 +251,31 @@ const DashboardPage = () => {
   };
 
   // Function to send balance notification to a single user
-  const sendBalanceNotification = async (employeeId: string) => {
+  const sendUserBalanceNotification = async (
+    employeeId: string,
+    messageTemplate?: string,
+    month?: string,
+    year?: number
+  ) => {
     setSendingNotification(true);
     try {
-      const response =
-        await transactionService.sendBalanceNotification(employeeId);
+      const response = await transactionService.sendBalanceNotification(
+        employeeId,
+        messageTemplate,
+        month,
+        year
+      );
       if (response.success) {
         toast.success(
-          `Balance notification sent to user with ID ${employeeId}`,
+          `Balance notification sent to user with ID ${employeeId}`
         );
+        setNotificationDialogOpen(false);
       } else {
         toast.error("Failed to send balance notification");
       }
     } catch (error) {
       console.error("Error sending balance notification:", error);
       toast.error("Failed to send balance notification");
-    } finally {
-      setSendingNotification(false);
-    }
-  };
-
-  // Function to send balance notifications to all users
-  const sendAllBalanceNotifications = async () => {
-    setSendingNotification(true);
-    try {
-      const response = await transactionService.sendAllBalanceNotifications();
-      if (response.success) {
-        toast.success("Balance notifications sent to all users");
-      } else {
-        toast.error("Failed to send balance notifications to all users");
-      }
-    } catch (error) {
-      console.error("Error sending all balance notifications:", error);
-      toast.error("Failed to send balance notifications to all users");
     } finally {
       setSendingNotification(false);
     }
@@ -301,7 +297,7 @@ const DashboardPage = () => {
                 variant={"outline"}
                 className={cn(
                   "w-[240px] pl-3 text-left font-normal",
-                  !dateRange && "text-muted-foreground",
+                  !dateRange && "text-muted-foreground"
                 )}
               >
                 {dateRange.from ? (
@@ -555,21 +551,7 @@ const DashboardPage = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Employee Account Balances</CardTitle>
-          {admin && (
-            <Button
-              onClick={sendAllBalanceNotifications}
-              disabled={sendingNotification || !whatsappStatus?.connected}
-              className="flex items-center gap-2"
-            >
-              {sendingNotification ? (
-                "Sending..."
-              ) : (
-                <>
-                  <Send className="h-4 w-4" /> Send All Balances
-                </>
-              )}
-            </Button>
-          )}
+          {admin && <SendAllBalance />}
         </CardHeader>
         <CardContent>
           {/* Search input */}
@@ -654,9 +636,10 @@ const DashboardPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() =>
-                                sendBalanceNotification(user.employee_id)
-                              }
+                              onClick={() => {
+                                setSelectedEmployeeId(user.employee_id);
+                                setNotificationDialogOpen(true);
+                              }}
                               disabled={
                                 sendingNotification ||
                                 !whatsappStatus?.connected ||
@@ -701,6 +684,23 @@ const DashboardPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* WhatsAppNotificationDialog */}
+      <WhatsAppNotificationDialog
+        open={notificationDialogOpen}
+        onOpenChange={setNotificationDialogOpen}
+        onSend={(messageTemplate, month, year) => {
+          if (selectedEmployeeId) {
+            sendUserBalanceNotification(
+              selectedEmployeeId,
+              messageTemplate,
+              month,
+              year
+            );
+          }
+        }}
+        sendingNotification={sendingNotification}
+      />
     </div>
   );
 };

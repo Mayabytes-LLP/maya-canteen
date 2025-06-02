@@ -9,8 +9,8 @@ import (
 
 // RegisterWhatsAppRoutes registers all routes for WhatsApp functionality
 func RegisterWhatsAppRoutes(router *mux.Router, db database.Service) {
-	// Create a WhatsApp handler using the global WhatsApp client
-	whatsappHandler := handlers.NewWhatsAppHandler(db, GlobalWebSocketHandler.GetWhatsAppClient())
+	// Create a WhatsApp handler using the global WhatsApp client getter (function, not instance)
+	whatsappHandler := handlers.NewWhatsAppHandler(db, GlobalWebSocketHandler.GetWhatsAppClient)
 
 	// Create a subrouter for WhatsApp routes
 	whatsappRouter := router.PathPrefix("/api/whatsapp").Subrouter()

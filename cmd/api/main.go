@@ -206,39 +206,20 @@ func setupWhatsapp() (*whatsmeow.Client, string) {
 	// Only add event handler for essential events (connection status)
 	client.AddEventHandler(eventHandler)
 
-	// Register the WhatsApp client with the WebSocket handler for refresh capability
-	routes.GlobalWebSocketHandler.SetWhatsAppClient(client)
-	routes.GlobalWebSocketHandler.RegisterQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
-		// Check if we already have credentials
-		if client.Store.ID != nil {
-			log.Info("WhatsApp credentials found")
-			// Inform the frontend that credentials exist
-			routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
-				"status":  "disconnected",
-				"message": "WhatsApp credentials found, click refresh to connect",
-			})
-		} else {
-			// No credentials, inform the frontend
-			log.Info("No WhatsApp credentials found")
-			routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
-				"status":  "disconnected",
-				"message": "No WhatsApp credentials found, click refresh to get QR code",
-			})
-		}
+	// Register the QR channel getter for the websocket handler using the shared WhatsApp client
+	// routes.GlobalWebSocketHandler.RegisterQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
+	// 	return whatsapp.GetQRChannel(ctx)
+	// })
 
-		return client.GetQRChannel(ctx)
-	})
-
-	// Initialize with disconnected status - we'll connect only on demand
-	routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
-		"status":  "disconnected",
-		"message": "WhatsApp initialized but not connected",
-	})
-	routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]any{
-		"qr_code_base64": "",
-		"logged_in":      false,
-	})
-
+	// // Initialize with disconnected status - we'll connect only on demand
+	// routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
+	// 	"status":  "disconnected",
+	// 	"message": "WhatsApp initialized but not connected",
+	// })
+	// routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]any{
+	// 	"qr_code_base64": "",
+	// 	"logged_in":      false,
+	// })
 	return client, filePath
 }
 
@@ -317,9 +298,11 @@ func main() {
 	os.Setenv("BLUEPRINT_DB_URL", setupDBPath())
 
 	eventLogger := logStd.New(logFile, "", logStd.LstdFlags)
-	apiServer := server.NewServer()
 	zkSocket := setupZKDevice(eventLogger)
 	whatsapp, whatsappDbPath := setupWhatsapp()
+
+	// Pass the WhatsApp client to the server so it is shared everywhere
+	apiServer := server.NewServer(whatsapp)
 
 	done := make(chan bool, 1)
 	go gracefulShutdown(apiServer, zkSocket, whatsapp, whatsappDbPath, done)
