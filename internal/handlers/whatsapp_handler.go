@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/handlers/common"
+	"maya-canteen/internal/models"
 	"net/http"
 	"strconv"
 	"strings"
@@ -82,25 +83,94 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 	return nil
 }
 
-// NotifyUserBalance sends a balance notification to a specific user
+// formatBalanceMessage formats the balance notification message with user details
+func (h *WhatsAppHandler) formatBalanceMessage(template string, name string, balance float64) string {
+	message := template
+	message = strings.ReplaceAll(message, "{name}", name)
+	message = strings.ReplaceAll(message, "{balance}", fmt.Sprintf("%.2f", balance))
+	return message
+}
+
+// formatTransactionHistory formats transaction history in both CSV and text format
+func (h *WhatsAppHandler) formatTransactionHistory(transactions []models.Transaction) (string, string) {
+	var csvContent strings.Builder
+	var textContent strings.Builder
+
+	// CSV Header
+	csvContent.WriteString("Date,Type,Amount,Description\n")
+
+	// Text Header
+	textContent.WriteString("Transaction History:\n")
+	textContent.WriteString("Date | Type | Amount | Description\n")
+	textContent.WriteString("--------------------------------\n")
+
+	for _, t := range transactions {
+		// CSV Format
+		desc := strings.ReplaceAll(t.Description, "\"", "\"\"") // escape quotes in description
+		csvContent.WriteString(fmt.Sprintf("%s,%s,%.2f,\"%s\"\n",
+			t.CreatedAt.Format("2006-01-02 15:04:05"),
+			t.TransactionType,
+			t.Amount,
+			desc))
+
+		// Text Format
+		textContent.WriteString(fmt.Sprintf("%s | %s | %.2f | %s\n",
+			t.CreatedAt.Format("2006-01-02"),
+			t.TransactionType,
+			t.Amount,
+			t.Description))
+	}
+
+	return csvContent.String(), textContent.String()
+}
+
+// sendBalanceNotification sends a balance notification to a single user
+func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance models.UserBalance, messageTemplate string, startDate, endDate time.Time) error {
+	// Format and send balance message
+	message := h.formatBalanceMessage(messageTemplate, user.Name, float64(userBalance.Balance))
+
+	// Get transactions for the period
+	transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
+	if err != nil {
+		return fmt.Errorf("failed to get transactions: %v", err)
+	}
+
+	// Filter transactions for this user
+	var userTransactions []models.Transaction
+	for _, t := range transactions {
+		if t.UserID == user.ID {
+			userTransactions = append(userTransactions, t)
+		}
+	}
+
+	// Format transaction history
+	csvContent, textContent := h.formatTransactionHistory(userTransactions)
+
+	// Send the balance message
+	if err := h.SendWhatsAppMessage(user.Phone, message); err != nil {
+		return fmt.Errorf("failed to send balance message: %v", err)
+	}
+
+	// Send transaction history in text format
+	if err := h.SendWhatsAppMessage(user.Phone, textContent); err != nil {
+		return fmt.Errorf("failed to send transaction text: %v", err)
+	}
+
+	// Send transaction history in CSV format
+	fileName := fmt.Sprintf("transactions_%s_%d.csv", startDate.Format("January"), startDate.Year())
+	if err := h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent), "text/csv"); err != nil {
+		return fmt.Errorf("failed to send transaction CSV: %v", err)
+	}
+
+	return nil
+}
+
 func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Request) {
 	client := h.GetWhatsAppClient()
-
-	if client == nil {
-		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not initialized")
+	if client == nil || !client.IsLoggedIn() || !client.IsConnected() {
+		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not available")
 		return
 	}
-	if !client.IsLoggedIn() {
-		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not connected")
-		return
-	}
-
-	connected := client.IsConnected()
-	if !connected {
-		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not connected")
-		return
-	}
-	log.Info("WhatsApp client disconnected")
 
 	vars := mux.Vars(r)
 	employeeID, err := h.ParseID(vars, "id")
@@ -116,20 +186,18 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Validate that user has a phone number
 	if user.Phone == "" {
 		common.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("User with employee ID %s does not have a phone number", strconv.FormatInt(employeeID, 10)))
 		return
 	}
 
-	// Get balance for the user
 	userBalance, err := h.DB.GetUserBalanceByUserID(user.ID)
 	if err != nil {
 		common.RespondWithError(w, http.StatusInternalServerError, "Failed to get user balance")
 		return
 	}
 
-	// Parse message_template and month from POST body
+	// Parse request body
 	type reqBody struct {
 		MessageTemplate string `json:"message_template"`
 		Month           string `json:"month"`
@@ -143,12 +211,7 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		messageTemplate = "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System."
 	}
 
-	// Replace placeholders
-	message := messageTemplate
-	message = strings.ReplaceAll(message, "{name}", user.Name)
-	message = strings.ReplaceAll(message, "{balance}", fmt.Sprintf("%.2f", float64(userBalance.Balance)))
-
-	// Get transactions for the specified month
+	// Set up date range
 	month := body.Month
 	year := body.Year
 	if month == "" {
@@ -158,7 +221,6 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		year = time.Now().Year()
 	}
 
-	// Parse the month name to get start and end dates
 	startDate, err := time.Parse("January 2006", fmt.Sprintf("%s %d", month, year))
 	if err != nil {
 		common.RespondWithError(w, http.StatusBadRequest, "Invalid month format")
@@ -166,42 +228,9 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 	}
 	endDate := startDate.AddDate(0, 1, 0).Add(-time.Second)
 
-	// Get transactions for the month
-	transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
-	if err != nil {
-		common.RespondWithError(w, http.StatusInternalServerError, "Failed to get transactions")
-		return
-	}
-
-	// Create CSV content
-	var csvContent strings.Builder
-	csvContent.WriteString("Date,Type,Amount,Description\n")
-	for _, t := range transactions {
-		if t.UserID == user.ID {
-			// Wrap the description in double quotes to handle commas
-			desc := strings.ReplaceAll(t.Description, "\"", "\"\"") // escape quotes in description
-			csvContent.WriteString(fmt.Sprintf("%s,%s,%.2f,\"%s\"\n",
-				t.CreatedAt.Format("2006-01-02 15:04:05"),
-				t.TransactionType,
-				t.Amount,
-				desc))
-		}
-	}
-
-	// Send the message via WhatsApp
-	err = h.SendWhatsAppMessage(user.Phone, message)
-	if err != nil {
-		log.Printf("Error sending WhatsApp balance notification to %s: %v", user.Phone, err)
-		common.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to send WhatsApp message: %v", err))
-		return
-	}
-
-	// Send the CSV file
-	fileName := fmt.Sprintf("transactions_%s_%d.csv", strings.ToLower(month), year)
-	err = h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent.String()), "text/csv")
-	if err != nil {
-		log.Printf("Error sending WhatsApp transaction document to %s: %v", user.Phone, err)
-		common.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to send WhatsApp document: %v", err))
+	// Send notification
+	if err := h.sendBalanceNotification(*user, userBalance, messageTemplate, startDate, endDate); err != nil {
+		common.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to send notification: %v", err))
 		return
 	}
 
@@ -211,11 +240,18 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 	})
 }
 
-// NotifyAllUsersBalances sends balance notifications to all users
 func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.Request) {
-	// Parse message_template from POST body
+	client := h.GetWhatsAppClient()
+	if client == nil || !client.IsLoggedIn() || !client.IsConnected() {
+		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not available")
+		return
+	}
+
+	// Parse request body
 	type reqBody struct {
 		MessageTemplate string `json:"message_template"`
+		Month           string `json:"month"`
+		Year            int    `json:"year"`
 	}
 	var body reqBody
 	_ = json.NewDecoder(r.Body).Decode(&body)
@@ -224,6 +260,23 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 	if messageTemplate == "" {
 		messageTemplate = "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System."
 	}
+
+	// Set up date range
+	month := body.Month
+	year := body.Year
+	if month == "" {
+		month = time.Now().Format("January")
+	}
+	if year == 0 {
+		year = time.Now().Year()
+	}
+
+	startDate, err := time.Parse("January 2006", fmt.Sprintf("%s %d", month, year))
+	if err != nil {
+		common.RespondWithError(w, http.StatusBadRequest, "Invalid month format")
+		return
+	}
+	endDate := startDate.AddDate(0, 1, 0).Add(-time.Second)
 
 	// Get all users with balances
 	userBalances, err := h.DB.GetUsersBalances()
@@ -236,34 +289,32 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 	failCount := 0
 	failedUsers := []string{}
 
-	// Send notification to each user with a phone number
+	// Send notification to each user
 	for _, balance := range userBalances {
-		// Skip users without phone numbers
-
-		if !balance.UserActive {
-			continue
-		}
-
-		if balance.Phone == "" {
+		if !balance.UserActive || balance.Phone == "" {
 			failCount++
-			failedUsers = append(failedUsers, fmt.Sprintf("%s (no phone number)", balance.UserName))
+			failedUsers = append(failedUsers, fmt.Sprintf("%s (inactive or no phone number)", balance.UserName))
 			continue
 		}
 
-		// Replace placeholders
-		message := messageTemplate
-		message = strings.ReplaceAll(message, "{name}", balance.UserName)
-		message = strings.ReplaceAll(message, "{balance}", fmt.Sprintf("%.2f", balance.Balance))
+		user := models.User{
+			ID:    balance.UserID,
+			Name:  balance.UserName,
+			Phone: balance.Phone,
+		}
 
-		// Send message
-		err = h.SendWhatsAppMessage(balance.Phone, message)
-		if err != nil {
+		userBalance := models.UserBalance{
+			Balance: balance.Balance,
+		}
+
+		if err := h.sendBalanceNotification(user, userBalance, messageTemplate, startDate, endDate); err != nil {
 			log.Printf("Failed to send WhatsApp notification to %s (%s): %v", balance.UserName, balance.Phone, err)
 			failCount++
 			failedUsers = append(failedUsers, fmt.Sprintf("%s (%v)", balance.UserName, err))
 		} else {
 			successCount++
 		}
+
 		// Add a small delay between messages to avoid rate limiting
 		time.Sleep(500 * time.Millisecond)
 	}
@@ -277,9 +328,6 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 			"failed_users":  failedUsers,
 		},
 	})
-
-	log.Infof("WhatsApp client pointer in WhatsAppHandler: %p", h.GetWhatsAppClient())
-
 }
 
 // SendDocumentMessage sends a document message to a user's WhatsApp number
