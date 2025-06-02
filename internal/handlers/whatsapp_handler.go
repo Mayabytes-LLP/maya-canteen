@@ -129,9 +129,11 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parse message_template from POST body
+	// Parse message_template and month from POST body
 	type reqBody struct {
 		MessageTemplate string `json:"message_template"`
+		Month           string `json:"month"`
+		Year            int    `json:"year"`
 	}
 	var body reqBody
 	_ = json.NewDecoder(r.Body).Decode(&body)
@@ -146,7 +148,45 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 	message = strings.ReplaceAll(message, "{name}", user.Name)
 	message = strings.ReplaceAll(message, "{balance}", fmt.Sprintf("%.2f", float64(userBalance.Balance)))
 
-	log.Infof("Sending WhatsApp message to %s: %s", user.Phone, message)
+	// Get transactions for the specified month
+	month := body.Month
+	year := body.Year
+	if month == "" {
+		month = time.Now().Format("January")
+	}
+	if year == 0 {
+		year = time.Now().Year()
+	}
+
+	// Parse the month name to get start and end dates
+	startDate, err := time.Parse("January 2006", fmt.Sprintf("%s %d", month, year))
+	if err != nil {
+		common.RespondWithError(w, http.StatusBadRequest, "Invalid month format")
+		return
+	}
+	endDate := startDate.AddDate(0, 1, 0).Add(-time.Second)
+
+	// Get transactions for the month
+	transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
+	if err != nil {
+		common.RespondWithError(w, http.StatusInternalServerError, "Failed to get transactions")
+		return
+	}
+
+	// Create CSV content
+	var csvContent strings.Builder
+	csvContent.WriteString("Date,Type,Amount,Description\n")
+	for _, t := range transactions {
+		if t.UserID == user.ID {
+			// Wrap the description in double quotes to handle commas
+			desc := strings.ReplaceAll(t.Description, "\"", "\"\"") // escape quotes in description
+			csvContent.WriteString(fmt.Sprintf("%s,%s,%.2f,\"%s\"\n",
+				t.CreatedAt.Format("2006-01-02 15:04:05"),
+				t.TransactionType,
+				t.Amount,
+				desc))
+		}
+	}
 
 	// Send the message via WhatsApp
 	err = h.SendWhatsAppMessage(user.Phone, message)
@@ -156,9 +196,18 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Send the CSV file
+	fileName := fmt.Sprintf("transactions_%s_%d.csv", strings.ToLower(month), year)
+	err = h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent.String()), "text/csv")
+	if err != nil {
+		log.Printf("Error sending WhatsApp transaction document to %s: %v", user.Phone, err)
+		common.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to send WhatsApp document: %v", err))
+		return
+	}
+
 	common.RespondWithJSON(w, http.StatusOK, map[string]any{
 		"success": true,
-		"message": fmt.Sprintf("Balance notification sent to %s", user.Name),
+		"message": fmt.Sprintf("Balance notification and transactions sent to %s", user.Name),
 	})
 }
 
@@ -231,4 +280,65 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 
 	log.Infof("WhatsApp client pointer in WhatsAppHandler: %p", h.GetWhatsAppClient())
 
+}
+
+// SendDocumentMessage sends a document message to a user's WhatsApp number
+func (h *WhatsAppHandler) SendDocumentMessage(phoneNumber string, fileName string, fileData []byte, mimeType string) error {
+	// Check if WhatsApp client is connected
+	client := h.GetWhatsAppClient()
+	if client == nil {
+		return fmt.Errorf("WhatsApp client is not initialized")
+	}
+	if !client.IsLoggedIn() {
+		log.Warn("WhatsApp client is not connected. Cannot send message.")
+		return fmt.Errorf("WhatsApp client is not connected")
+	}
+
+	results, err := client.IsOnWhatsApp([]string{phoneNumber})
+	if err != nil {
+		return fmt.Errorf("failed to check WhatsApp status: %v", err)
+	}
+	if len(results) == 0 || !results[0].IsIn {
+		log.Warnf("Phone number %s is not on WhatsApp", phoneNumber)
+		return fmt.Errorf("phone number is not on WhatsApp")
+	}
+
+	if len(results) > 1 {
+		log.Warnf("Multiple results for phone number %s: %v", phoneNumber, results)
+		return fmt.Errorf("multiple results for phone number")
+	}
+	recipient := results[0].JID
+
+	log.Infof("Sending WhatsApp document to %s: %s", recipient, fileName)
+
+	// Upload the file to WhatsApp servers
+	uploaded, err := client.Upload(context.Background(), fileData, whatsmeow.MediaDocument)
+	if err != nil {
+		return fmt.Errorf("failed to upload document: %v", err)
+	}
+
+	// Create document message
+	msg := &waProto.Message{
+		DocumentMessage: &waProto.DocumentMessage{
+			FileName:      proto.String(fileName),
+			Mimetype:      proto.String(mimeType),
+			DirectPath:    proto.String(uploaded.DirectPath),
+			MediaKey:      uploaded.MediaKey,
+			FileEncSHA256: uploaded.FileEncSHA256,
+			FileSHA256:    uploaded.FileSHA256,
+			FileLength:    proto.Uint64(uint64(len(fileData))),
+			URL:           proto.String(uploaded.URL),
+		},
+	}
+
+	// Send message with 10-second timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	_, err = client.SendMessage(ctx, recipient, msg)
+	if err != nil {
+		return fmt.Errorf("failed to send WhatsApp document: %v", err)
+	}
+
+	return nil
 }

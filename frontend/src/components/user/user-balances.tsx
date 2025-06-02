@@ -40,6 +40,7 @@ import * as z from "zod";
 import { Button } from "../ui/button";
 import UserTransactions from "./user-transactions";
 
+import SendAllBalance from "@/components/send-all-banlance";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
@@ -50,9 +51,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { WhatsAppNotificationDialog } from "@/components/whatsapp-notification-dialog";
 import { AppContext } from "@/context";
 import { BalanceTable } from "./user-data-table";
-import SendAllBalance from "@/components/send-all-banlance";
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -81,6 +82,11 @@ export default function UserBalances({
   const [sendingNotification, setSendingNotification] = useState(false);
 
   const { admin, whatsappStatus } = useContext(AppContext);
+
+  const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(
+    null
+  );
 
   // Initialize form
   const form = useForm<FormValues>({
@@ -111,20 +117,25 @@ export default function UserBalances({
   }, [refreshTrigger]);
 
   // Function to send balance notification to a single user
-  const sendBalanceNotification = async (
+  const sendUserBalanceNotification = async (
     employeeId: string,
-    messageTemplate?: string
+    messageTemplate?: string,
+    month?: string,
+    year?: number
   ) => {
     setSendingNotification(true);
     try {
       const response = await transactionService.sendBalanceNotification(
         employeeId,
-        messageTemplate
+        messageTemplate,
+        month,
+        year
       );
       if (response.success) {
         toast.success(
           `Balance notification sent to user with ID ${employeeId}`
         );
+        setNotificationDialogOpen(false);
       } else {
         toast.error("Failed to send balance notification");
       }
@@ -269,7 +280,10 @@ export default function UserBalances({
               onEdit={handleEdit}
               onDelete={confirmDelete}
               sendingNotification={sendingNotification}
-              onSendBalanceNotification={sendBalanceNotification}
+              onSendBalanceNotification={(employeeId: string) => {
+                setSelectedEmployeeId(employeeId);
+                setNotificationDialogOpen(true);
+              }}
             />
           </div>
         )}
@@ -471,6 +485,23 @@ export default function UserBalances({
           )}
         </DialogContent>
       </Dialog>
+
+      {/* WhatsAppNotificationDialog */}
+      <WhatsAppNotificationDialog
+        open={notificationDialogOpen}
+        onOpenChange={setNotificationDialogOpen}
+        onSend={(messageTemplate, month, year) => {
+          if (selectedEmployeeId) {
+            sendUserBalanceNotification(
+              selectedEmployeeId,
+              messageTemplate,
+              month,
+              year
+            );
+          }
+        }}
+        sendingNotification={sendingNotification}
+      />
     </Card>
   );
 }

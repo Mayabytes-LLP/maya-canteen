@@ -1,3 +1,4 @@
+import SendAllBalance from "@/components/send-all-banlance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import UserTransactions from "@/components/user/user-transactions";
+import { WhatsAppNotificationDialog } from "@/components/whatsapp-notification-dialog";
 import { AppContext } from "@/context";
 import { cn } from "@/lib/utils";
 import {
@@ -59,7 +61,6 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import SendAllBalance from "@/components/send-all-banlance";
 
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8"];
 
@@ -75,6 +76,10 @@ const DashboardPage = () => {
   const [openTransactionsDialog, setOpenTransactionsDialog] = useState(false);
   const [sendingNotification, setSendingNotification] = useState(false);
   const { admin, whatsappStatus } = useContext(AppContext);
+  const [notificationDialogOpen, setNotificationDialogOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(
+    null
+  );
 
   // Filtered balances based on search query
   const filteredBalances = userBalances.filter(
@@ -246,16 +251,25 @@ const DashboardPage = () => {
   };
 
   // Function to send balance notification to a single user
-  const sendBalanceNotification = async (employeeId: string) => {
+  const sendUserBalanceNotification = async (
+    employeeId: string,
+    messageTemplate?: string,
+    month?: string,
+    year?: number
+  ) => {
     setSendingNotification(true);
     try {
       const response = await transactionService.sendBalanceNotification(
-        employeeId
+        employeeId,
+        messageTemplate,
+        month,
+        year
       );
       if (response.success) {
         toast.success(
           `Balance notification sent to user with ID ${employeeId}`
         );
+        setNotificationDialogOpen(false);
       } else {
         toast.error("Failed to send balance notification");
       }
@@ -622,9 +636,10 @@ const DashboardPage = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() =>
-                                sendBalanceNotification(user.employee_id)
-                              }
+                              onClick={() => {
+                                setSelectedEmployeeId(user.employee_id);
+                                setNotificationDialogOpen(true);
+                              }}
                               disabled={
                                 sendingNotification ||
                                 !whatsappStatus?.connected ||
@@ -669,6 +684,23 @@ const DashboardPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* WhatsAppNotificationDialog */}
+      <WhatsAppNotificationDialog
+        open={notificationDialogOpen}
+        onOpenChange={setNotificationDialogOpen}
+        onSend={(messageTemplate, month, year) => {
+          if (selectedEmployeeId) {
+            sendUserBalanceNotification(
+              selectedEmployeeId,
+              messageTemplate,
+              month,
+              year
+            );
+          }
+        }}
+        sendingNotification={sendingNotification}
+      />
     </div>
   );
 };

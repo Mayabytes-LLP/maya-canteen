@@ -18,18 +18,10 @@ import {
   Pencil,
   Search,
   Send,
-  SendToBack,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -52,16 +44,6 @@ import type { UserBalance as Balance } from "@/services/transaction-service";
 
 import { Badge } from "@/components/ui/badge";
 import { CopyButton } from "@/components/ui/copy-button";
-import { Link } from "react-router";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface BalanceTableProps {
   data: Balance[];
@@ -70,10 +52,7 @@ interface BalanceTableProps {
   onViewTransactions: (employeeId: string) => void;
   onEdit: (balance: Balance) => void;
   onDelete: (userId: number) => void;
-  onSendBalanceNotification: (
-    employeeId: string,
-    messageTemplate: string
-  ) => void;
+  onSendBalanceNotification: (employeeId: string) => void;
   sendingNotification: boolean;
 }
 
@@ -91,42 +70,6 @@ export function BalanceTable({
   const [searchQuery, setSearchQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
-  const [messageTemplate, setMessageTemplate] = useState("");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(
-    null
-  );
-  // Add state for month and year selection
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    const now = new Date();
-    return now.toLocaleString("default", { month: "long" });
-  });
-  const [selectedYear, setSelectedYear] = useState<number>(() => {
-    return new Date().getFullYear();
-  });
-
-  const [selectedDuration, setSelectedDuration] =
-    useState<string>("Half month");
-  const months = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ];
-  const years = Array.from(
-    { length: 5 },
-    (_, i) => new Date().getFullYear() - 2 + i
-  );
-  const defaultTemplate =
-    "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) {duration} of Canteen bill for {month} {year}\n\nThis is an automated message from Maya Canteen Management System.";
 
   // Update search filter when searchQuery changes
   useEffect(() => {
@@ -141,25 +84,6 @@ export function BalanceTable({
       setColumnFilters([]);
     }
   }, [searchQuery]);
-
-  // Generate WhatsApp URL function
-  const generateWhatsappUrl = (
-    phone: string,
-    name: string,
-    balance: number
-  ) => {
-    const currentDate = new Date();
-    currentDate.setDate(1);
-    currentDate.setMonth(currentDate.getMonth());
-    // currentDate.setMonth(currentDate.getMonth() - 1);
-    const prevMonth = currentDate.toLocaleString("default", { month: "long" });
-    const prevYear = currentDate.getFullYear();
-    const message = `**Balance Update** \n\nDear ${name},\nYour current canteen balance is: *PKR ${balance.toFixed(
-      2
-    )}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month ${prevMonth} ${prevYear} of Canteen bill\n\nAfter pay share screenshot\n\nThis is an automated message from Maya Canteen Management System.`;
-
-    return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  };
 
   // Define columns
   const columns: ColumnDef<Balance>[] = [
@@ -237,45 +161,18 @@ export function BalanceTable({
             <Button
               variant="ghost"
               size="sm"
-              disabled={sendingNotification || !balance.user_phone}
+              onClick={() => onSendBalanceNotification(balance.employee_id)}
+              disabled={
+                sendingNotification ||
+                !whatsappStatus.connected ||
+                !balance.user_phone
+              }
               className="h-8 w-8 p-0"
               title="Send Balance Notification"
-              asChild
             >
-              <Link
-                to={generateWhatsappUrl(
-                  balance.user_phone,
-                  balance.user_name,
-                  balance.balance
-                )}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <SendToBack className="h-4 w-4" />
-                <span className="sr-only">Send Balance Notification</span>
-              </Link>
+              <Send className="h-4 w-4" />
+              <span className="sr-only">Send Balance Notification</span>
             </Button>
-            {admin && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSelectedEmployeeId(balance.employee_id);
-                  setMessageTemplate(defaultTemplate);
-                  setMessageDialogOpen(true);
-                }}
-                disabled={
-                  sendingNotification ||
-                  !whatsappStatus.connected ||
-                  !balance.user_phone
-                }
-                className="h-8 w-8 p-0"
-                title="Send Balance Notification"
-              >
-                <Send className="h-4 w-4" />
-                <span className="sr-only">Send Balance Notification</span>
-              </Button>
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="h-8 w-8 p-0">
@@ -417,107 +314,6 @@ export function BalanceTable({
           </Button>
         </div>
       </div>
-
-      {/* Message Template Dialog */}
-      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit WhatsApp Message</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <div className="text-xs text-muted-foreground">
-              You can use <code>{"{name}"}</code>, <code>{"{balance}"}</code>,{" "}
-              <code>{"{month}"}</code> and <code>{"{year}"}</code> as
-              placeholders.
-            </div>
-            <div className="flex gap-2">
-              <Select
-                value={selectedMonth}
-                onValueChange={(value) => setSelectedMonth(value)}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Select Month" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {months.map((month) => (
-                      <SelectItem key={month} value={month}>
-                        {month}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <Select
-                value={selectedYear.toString()}
-                onValueChange={(value) => setSelectedYear(parseInt(value, 10))}
-              >
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue placeholder="Year" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {years.map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={selectedDuration}
-                onValueChange={(value) => setSelectedDuration(value)}
-              >
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue placeholder="Duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    <SelectItem key="half-month" value="Half month">
-                      Half Month
-                    </SelectItem>
-                    <SelectItem key="full-month" value="Full month">
-                      Full Month
-                    </SelectItem>
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-            </div>
-            <Textarea
-              rows={6}
-              value={messageTemplate}
-              onChange={(e) => setMessageTemplate(e.target.value)}
-              className="w-full min-h-[120px] font-mono"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              onClick={() => {
-                if (selectedEmployeeId) {
-                  // Replace placeholders with selected month/year
-                  const finalMessage = messageTemplate
-                    .replace(/\{month\}/g, selectedMonth)
-                    .replace(/\{year\}/g, selectedYear.toString())
-                    .replace(/\{duration\}/g, selectedDuration);
-                  onSendBalanceNotification(selectedEmployeeId, finalMessage);
-                }
-                setMessageDialogOpen(false);
-              }}
-              disabled={sendingNotification}
-            >
-              Send Notification
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setMessageDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

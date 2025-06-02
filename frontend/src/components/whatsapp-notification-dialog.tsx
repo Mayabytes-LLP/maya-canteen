@@ -1,13 +1,11 @@
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -18,17 +16,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { AppContext } from "@/context";
-import { transactionService } from "@/services/transaction-service";
-import { MessageCircle } from "lucide-react";
-import { useContext, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 
-export default function SendAllBalance() {
-  const { whatsappStatus } = useContext(AppContext);
+interface WhatsAppNotificationDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSend: (messageTemplate: string, month: string, year: number) => void;
+  sendingNotification: boolean;
+}
 
-  const [allMessageDialogOpen, setAllMessageDialogOpen] = useState(false);
-  // Add state for month and year selection
+export function WhatsAppNotificationDialog({
+  open,
+  onOpenChange,
+  onSend,
+  sendingNotification,
+}: WhatsAppNotificationDialogProps) {
+  const [messageTemplate, setMessageTemplate] = useState<string>(() => {
+    return "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) {duration} of Canteen bill for {month} {year}\n\nThis is an automated message from Maya Canteen Management System.";
+  });
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return now.toLocaleString("default", { month: "long" });
@@ -36,10 +41,9 @@ export default function SendAllBalance() {
   const [selectedYear, setSelectedYear] = useState<number>(() => {
     return new Date().getFullYear();
   });
-  const [sendingAllNotifications, setSendingAllNotifications] = useState(false);
-
   const [selectedDuration, setSelectedDuration] =
     useState<string>("Half month");
+
   const months = [
     "January",
     "February",
@@ -58,63 +62,24 @@ export default function SendAllBalance() {
     { length: 5 },
     (_, i) => new Date().getFullYear() - 2 + i
   );
-  const defaultTemplate =
-    "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) {duration} of Canteen bill for {month} {year}\n\nThis is an automated message from Maya Canteen Management System.";
 
-  const [allMessageTemplate, setAllMessageTemplate] =
-    useState<string>(defaultTemplate);
-
-  // Function to send balance notifications to all users
-  const sendAllBalanceNotifications = async (
-    messageTemplate?: string,
-    month?: string,
-    year?: number
-  ) => {
-    setSendingAllNotifications(true);
-    try {
-      const response = await transactionService.sendAllBalanceNotifications(
-        messageTemplate,
-        month,
-        year
-      );
-      if (response.success) {
-        toast.success("Balance notifications sent to all users");
-      } else {
-        toast.error("Failed to send balance notifications to all users");
-      }
-    } catch (error) {
-      console.error("Error sending all balance notifications:", error);
-      toast.error("Failed to send balance notifications to all users");
-    } finally {
-      setSendingAllNotifications(false);
-    }
+  const handleSend = () => {
+    const finalMessage = messageTemplate
+      .replace(/\{month\}/g, selectedMonth)
+      .replace(/\{year\}/g, selectedYear.toString())
+      .replace(/\{duration\}/g, selectedDuration);
+    onSend(finalMessage, selectedMonth, selectedYear);
   };
+
   return (
-    <Dialog open={allMessageDialogOpen} onOpenChange={setAllMessageDialogOpen}>
-      <DialogTrigger asChild>
-        <Button
-          onClick={() => setAllMessageDialogOpen(true)}
-          disabled={sendingAllNotifications || !whatsappStatus.connected}
-          className="flex items-center gap-2"
-        >
-          {sendingAllNotifications ? (
-            "Sending..."
-          ) : (
-            <>
-              <MessageCircle className="h-4 w-4" /> Send All Balances
-            </>
-          )}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit WhatsApp Message for All Users</DialogTitle>
+          <DialogTitle>Edit WhatsApp Message</DialogTitle>
+          <DialogDescription>
+            You can edit the message template that will be sent to the user.
+          </DialogDescription>
         </DialogHeader>
-        <DialogDescription>
-          You can edit the message template that will be sent to all users. The
-          message will be sent to all users with a balance.
-        </DialogDescription>
-        <DialogClose />
         <div className="space-y-2">
           <div className="text-xs text-muted-foreground">
             You can use <code>{"{name}"}</code>, <code>{"{balance}"}</code>,{" "}
@@ -178,33 +143,16 @@ export default function SendAllBalance() {
           </div>
           <Textarea
             rows={6}
-            value={allMessageTemplate}
-            onChange={(e) => setAllMessageTemplate(e.target.value)}
+            value={messageTemplate}
+            onChange={(e) => setMessageTemplate(e.target.value)}
             className="w-full min-h-[120px] font-mono"
           />
         </div>
         <DialogFooter>
-          <Button
-            onClick={() => {
-              const finalMessage = allMessageTemplate
-                .replace(/\{month\}/g, selectedMonth)
-                .replace(/\{year\}/g, selectedYear.toString())
-                .replace(/\{duration\}/g, selectedDuration);
-              sendAllBalanceNotifications(
-                finalMessage,
-                selectedMonth,
-                selectedYear
-              );
-              setAllMessageDialogOpen(false);
-            }}
-            disabled={sendingAllNotifications}
-          >
-            Send Notifications
+          <Button onClick={handleSend} disabled={sendingNotification}>
+            Send Notification
           </Button>
-          <Button
-            variant="outline"
-            onClick={() => setAllMessageDialogOpen(false)}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
         </DialogFooter>

@@ -490,14 +490,18 @@ export const transactionService = {
   // Add new functions for WhatsApp notification
   async sendBalanceNotification(
     employeeId: string,
-    messageTemplate?: string
+    messageTemplate?: string,
+    month?: string,
+    year?: number
   ): Promise<{ success: boolean; message?: string }> {
     const response = await fetch(`${API_BASE}/whatsapp/notify/${employeeId}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        messageTemplate ? { message_template: messageTemplate } : {}
-      ),
+      body: JSON.stringify({
+        message_template: messageTemplate,
+        month: month,
+        year: year,
+      }),
     });
 
     if (!response.ok) {
@@ -508,7 +512,11 @@ export const transactionService = {
     return { success: true };
   },
 
-  async sendAllBalanceNotifications(messageTemplate?: string): Promise<{
+  async sendAllBalanceNotifications(
+    messageTemplate?: string,
+    month?: string,
+    year?: number
+  ): Promise<{
     success: boolean;
     message?: string;
   }> {
@@ -516,7 +524,9 @@ export const transactionService = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
-        messageTemplate ? { message_template: messageTemplate } : {}
+        messageTemplate
+          ? { message_template: messageTemplate, month: month, year: year }
+          : {}
       ),
     });
 
