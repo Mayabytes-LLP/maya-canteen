@@ -46,7 +46,7 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 		return fmt.Errorf("WhatsApp client is not connected")
 	}
 
-	results, err := h.GetWhatsAppClient().IsOnWhatsApp([]string{phoneNumber})
+	results, err := client.IsOnWhatsApp([]string{phoneNumber})
 	if err != nil {
 		return fmt.Errorf("failed to check WhatsApp status: %v", err)
 	}
@@ -84,16 +84,18 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 
 // NotifyUserBalance sends a balance notification to a specific user
 func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Request) {
-	if h.GetWhatsAppClient() == nil {
+	client := h.GetWhatsAppClient()
+
+	if client == nil {
 		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not initialized")
 		return
 	}
-	if !h.GetWhatsAppClient().IsLoggedIn() {
+	if !client.IsLoggedIn() {
 		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not connected")
 		return
 	}
 
-	connected := h.GetWhatsAppClient().IsConnected()
+	connected := client.IsConnected()
 	if !connected {
 		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not connected")
 		return
@@ -188,6 +190,11 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 	// Send notification to each user with a phone number
 	for _, balance := range userBalances {
 		// Skip users without phone numbers
+
+		if !balance.UserActive {
+			continue
+		}
+
 		if balance.Phone == "" {
 			failCount++
 			failedUsers = append(failedUsers, fmt.Sprintf("%s (no phone number)", balance.UserName))
