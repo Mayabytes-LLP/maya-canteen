@@ -15,8 +15,9 @@ import (
 
 // Server represents the HTTP server
 type Server struct {
-	port int
-	db   database.Service
+	port           int
+	db             database.Service
+	whatsappClient handlers.WhatsAppClient
 }
 
 // NewServer creates a new server instance
@@ -28,18 +29,25 @@ func NewServer(whatsappClient handlers.WhatsAppClient) *http.Server {
 
 	// Create server instance
 	s := &Server{
-		port: port,
-		db:   database.New(),
+		port:           port,
+		db:             database.New(),
+		whatsappClient: whatsappClient,
 	}
 
 	// Declare Server config
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%d", s.port),
-		Handler:      routes.RegisterRoutes(s.db, whatsappClient),
+		Handler:      routes.RegisterRoutes(s.db, s.whatsappClient),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 	}
 
 	return server
+}
+
+// UpdateWhatsAppClient updates the WhatsApp client
+func (s *Server) UpdateWhatsAppClient(client handlers.WhatsAppClient) {
+	s.whatsappClient = client
+	routes.GlobalWebSocketHandler.UpdateWhatsAppClient(client)
 }

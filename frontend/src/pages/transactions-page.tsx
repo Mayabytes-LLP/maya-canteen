@@ -99,16 +99,18 @@ export default function TransactionsPage() {
             </CardHeader>
             <CardContent className="flex flex-col items-center">
               {whatsappQR ? (
-                <div className="flex flex-col items-center">
-                  <QRCodeSVG
-                    value={whatsappQR}
-                    size={320}
-                    level="H"
-                    bgColor="#000"
-                    fgColor="#fff"
-                    className="p-2 bg-white rounded-md border"
-                  />
-                  <p className="mt-2 text-sm text-muted-foreground">
+                <div className="flex flex-col items-center w-full bg-white p-4 rounded-lg">
+                  <div className="p-4 rounded-lg shadow-lg">
+                    <QRCodeSVG
+                      value={whatsappQR}
+                      size={400}
+                      level="L"
+                      bgColor="#ffffff"
+                      fgColor="#000000"
+                      marginSize={10}
+                    />
+                  </div>
+                  <p className="mt-4 text-sm text-muted-foreground">
                     Scan with WhatsApp to login
                   </p>
                 </div>

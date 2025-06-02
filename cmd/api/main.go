@@ -207,19 +207,19 @@ func setupWhatsapp() (*whatsmeow.Client, string) {
 	client.AddEventHandler(eventHandler)
 
 	// Register the QR channel getter for the websocket handler using the shared WhatsApp client
-	// routes.GlobalWebSocketHandler.RegisterQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
-	// 	return whatsapp.GetQRChannel(ctx)
-	// })
+	routes.GlobalWebSocketHandler.RegisterQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
+		return client.GetQRChannel(ctx)
+	})
 
-	// // Initialize with disconnected status - we'll connect only on demand
-	// routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
-	// 	"status":  "disconnected",
-	// 	"message": "WhatsApp initialized but not connected",
-	// })
-	// routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]any{
-	// 	"qr_code_base64": "",
-	// 	"logged_in":      false,
-	// })
+	// Initialize with disconnected status - we'll connect only on demand
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_status", map[string]any{
+		"status":  "disconnected",
+		"message": "WhatsApp initialized but not connected",
+	})
+	routes.GlobalWebSocketHandler.Broadcast("whatsapp_qr", map[string]any{
+		"qr_code_base64": "",
+		"logged_in":      false,
+	})
 	return client, filePath
 }
 
@@ -299,10 +299,17 @@ func main() {
 
 	eventLogger := logStd.New(logFile, "", logStd.LstdFlags)
 	zkSocket := setupZKDevice(eventLogger)
+
+	// Initialize the server first with a nil WhatsApp client
+	apiServer := server.NewServer(nil)
+
+	// Now set up WhatsApp with the initialized WebSocket handler
 	whatsapp, whatsappDbPath := setupWhatsapp()
 
-	// Pass the WhatsApp client to the server so it is shared everywhere
-	apiServer := server.NewServer(whatsapp)
+	// Update the WebSocket handler with the WhatsApp client
+	if routes.GlobalWebSocketHandler != nil {
+		routes.GlobalWebSocketHandler.UpdateWhatsAppClient(whatsapp)
+	}
 
 	done := make(chan bool, 1)
 	go gracefulShutdown(apiServer, zkSocket, whatsapp, whatsappDbPath, done)

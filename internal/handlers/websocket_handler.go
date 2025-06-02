@@ -398,3 +398,10 @@ func (h *WebsocketHandler) GetWhatsAppClient() *whatsmeow.Client {
 	}
 	return nil
 }
+
+// UpdateWhatsAppClient updates the WhatsApp client
+func (h *WebsocketHandler) UpdateWhatsAppClient(client WhatsAppClient) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.whatsappClient = client
+}
