@@ -77,8 +77,25 @@ export default function SendAllBalance() {
         month,
         year
       );
-      if (response.success) {
-        toast.success("Balance notifications sent to all users");
+      if (response.success && response.data) {
+        // Show success message with details
+        toast.success(
+          <div className="space-y-2">
+            <p>{response.data.message}</p>
+            {response.data.details.failed_users.length > 0 && (
+              <div className="text-sm">
+                <p className="font-semibold">Failed Users:</p>
+                <ul className="list-disc pl-4">
+                  {response.data.details.failed_users.map(
+                    (user: string, index: number) => (
+                      <li key={index}>{user}</li>
+                    )
+                  )}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
       } else {
         toast.error("Failed to send balance notifications to all users");
       }

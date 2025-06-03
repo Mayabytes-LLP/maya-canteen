@@ -518,9 +518,18 @@ export const transactionService = {
     year?: number
   ): Promise<{
     success: boolean;
+    data?: {
+      details: {
+        fail_count: number;
+        failed_users: string[];
+        success_count: number;
+      };
+      message: string;
+      success: boolean;
+    };
     message?: string;
   }> {
-    const response = await fetch(`${API_BASE}/whatsapp/send-all-balances`, {
+    const response = await fetch(`${API_BASE}/whatsapp/notify-all`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
@@ -535,6 +544,7 @@ export const transactionService = {
       return { success: false, message: error.message };
     }
 
-    return { success: true };
+    const data = await response.json();
+    return { success: true, data: data.data };
   },
 };

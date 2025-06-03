@@ -129,20 +129,23 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 	// Format and send balance message
 	message := h.formatBalanceMessage(messageTemplate, user.Name, float64(userBalance.Balance))
 
+	fmt.Printf("Sending balance notification to %s: %s\n", user.Phone, message)
+
+	//
 	// Get transactions for the period
-	transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
-	if err != nil {
-		return fmt.Errorf("failed to get transactions: %v", err)
-	}
-
-	// Filter transactions for this user
-	var userTransactions []models.Transaction
-	for _, t := range transactions {
-		if t.UserID == user.ID {
-			userTransactions = append(userTransactions, t)
-		}
-	}
-
+	// transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
+	// if err != nil {
+	// 	return fmt.Errorf("failed to get transactions: %v", err)
+	// }
+	//
+	// // Filter transactions for this user
+	// var userTransactions []models.Transaction
+	// for _, t := range transactions {
+	// 	if t.UserID == user.ID {
+	// 		userTransactions = append(userTransactions, t)
+	// 	}
+	// }
+	//
 	// Format transaction history
 	// csvContent, textContent := h.formatTransactionHistory(userTransactions)
 
@@ -316,7 +319,7 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 		}
 
 		// Add a small delay between messages to avoid rate limiting
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}
 
 	common.RespondWithJSON(w, http.StatusOK, map[string]any{
