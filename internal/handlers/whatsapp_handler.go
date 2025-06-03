@@ -125,46 +125,50 @@ func (h *WhatsAppHandler) formatTransactionHistory(transactions []models.Transac
 }
 
 // sendBalanceNotification sends a balance notification to a single user
-func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance models.UserBalance, messageTemplate string, startDate, endDate time.Time) error {
+func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance models.UserBalance, messageTemplate string, startDate, endDate time.Time, includeTransactions bool) error {
 	// Format and send balance message
 	message := h.formatBalanceMessage(messageTemplate, user.Name, float64(userBalance.Balance))
 
 	fmt.Printf("Sending balance notification to %s: %s\n", user.Phone, message)
 
-	//
-	// Get transactions for the period
-	// transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
-	// if err != nil {
-	// 	return fmt.Errorf("failed to get transactions: %v", err)
-	// }
-	//
-	// // Filter transactions for this user
-	// var userTransactions []models.Transaction
-	// for _, t := range transactions {
-	// 	if t.UserID == user.ID {
-	// 		userTransactions = append(userTransactions, t)
-	// 	}
-	// }
-	//
-	// Format transaction history
-	// csvContent, textContent := h.formatTransactionHistory(userTransactions)
+	if includeTransactions {
+		// Get transactions for the period
+		transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
+		if err != nil {
+			return fmt.Errorf("failed to get transactions: %v", err)
+		}
 
-	// Send the balance message
-	if err := h.SendWhatsAppMessage(user.Phone, message); err != nil {
-		return fmt.Errorf("failed to send balance message: %v", err)
+		// Filter transactions for this user
+		var userTransactions []models.Transaction
+		for _, t := range transactions {
+			if t.UserID == user.ID {
+				userTransactions = append(userTransactions, t)
+			}
+		}
+
+		// Format transaction history
+		csvContent, textContent := h.formatTransactionHistory(userTransactions)
+
+		// Combine balance message with transaction history
+		combinedMessage := message + "\n\n" + textContent
+
+		// Send the combined message
+		if err := h.SendWhatsAppMessage(user.Phone, combinedMessage); err != nil {
+			return fmt.Errorf("failed to send combined message: %v", err)
+		}
+
+		// Send transaction history in CSV format
+		fileName := fmt.Sprintf("transactions_%s_%d.csv", startDate.Format("January"), startDate.Year())
+		if err := h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent), "text/csv"); err != nil {
+			return fmt.Errorf("failed to send transaction CSV: %v", err)
+		}
+	} else {
+		// Send just the balance message
+		if err := h.SendWhatsAppMessage(user.Phone, message); err != nil {
+			return fmt.Errorf("failed to send balance message: %v", err)
+		}
 	}
 
-	// // Send transaction history in text format
-	// if err := h.SendWhatsAppMessage(user.Phone, textContent); err != nil {
-	// 	return fmt.Errorf("failed to send transaction text: %v", err)
-	// }
-	//
-	// Send transaction history in CSV format
-	// fileName := fmt.Sprintf("transactions_%s_%d.csv", startDate.Format("January"), startDate.Year())
-	// if err := h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent), "text/csv"); err != nil {
-	// 	return fmt.Errorf("failed to send transaction CSV: %v", err)
-	// }
-	//
 	return nil
 }
 
@@ -202,9 +206,10 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 
 	// Parse request body
 	type reqBody struct {
-		MessageTemplate string `json:"message_template"`
-		Month           string `json:"month"`
-		Year            int    `json:"year"`
+		MessageTemplate     string `json:"message_template"`
+		Month               string `json:"month"`
+		Year                int    `json:"year"`
+		IncludeTransactions bool   `json:"include_transactions"`
 	}
 	var body reqBody
 	_ = json.NewDecoder(r.Body).Decode(&body)
@@ -232,14 +237,14 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 	endDate := startDate.AddDate(0, 1, 0).Add(-time.Second)
 
 	// Send notification
-	if err := h.sendBalanceNotification(*user, userBalance, messageTemplate, startDate, endDate); err != nil {
+	if err := h.sendBalanceNotification(*user, userBalance, messageTemplate, startDate, endDate, body.IncludeTransactions); err != nil {
 		common.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to send notification: %v", err))
 		return
 	}
 
 	common.RespondWithJSON(w, http.StatusOK, map[string]any{
 		"success": true,
-		"message": fmt.Sprintf("Balance notification and transactions sent to %s", user.Name),
+		"message": fmt.Sprintf("Balance notification sent to %s", user.Name),
 	})
 }
 
@@ -252,9 +257,10 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 
 	// Parse request body
 	type reqBody struct {
-		MessageTemplate string `json:"message_template"`
-		Month           string `json:"month"`
-		Year            int    `json:"year"`
+		MessageTemplate     string `json:"message_template"`
+		Month               string `json:"month"`
+		Year                int    `json:"year"`
+		IncludeTransactions bool   `json:"include_transactions"`
 	}
 	var body reqBody
 	_ = json.NewDecoder(r.Body).Decode(&body)
@@ -292,8 +298,17 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 	failCount := 0
 	failedUsers := []string{}
 
+	// Create a map to track processed users to avoid duplicates
+	processedUsers := make(map[int64]bool)
+
 	// Send notification to each user
 	for _, balance := range userBalances {
+		// Skip if user is already processed
+		if processedUsers[balance.UserID] {
+			continue
+		}
+		processedUsers[balance.UserID] = true
+
 		if !balance.UserActive || balance.Phone == "" {
 			failCount++
 			failedUsers = append(failedUsers, fmt.Sprintf("%s (inactive or no phone number)", balance.UserName))
@@ -310,7 +325,7 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 			Balance: balance.Balance,
 		}
 
-		if err := h.sendBalanceNotification(user, userBalance, messageTemplate, startDate, endDate); err != nil {
+		if err := h.sendBalanceNotification(user, userBalance, messageTemplate, startDate, endDate, body.IncludeTransactions); err != nil {
 			log.Printf("Failed to send WhatsApp notification to %s (%s): %v", balance.UserName, balance.Phone, err)
 			failCount++
 			failedUsers = append(failedUsers, fmt.Sprintf("%s (%v)", balance.UserName, err))

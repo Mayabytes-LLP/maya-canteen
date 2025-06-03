@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -7,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,7 +23,12 @@ import { useState } from "react";
 interface WhatsAppNotificationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSend: (messageTemplate: string, month: string, year: number) => void;
+  onSend: (
+    messageTemplate: string,
+    month: string,
+    year: number,
+    includeTransactions: boolean
+  ) => void;
   sendingNotification: boolean;
 }
 
@@ -43,6 +50,7 @@ export function WhatsAppNotificationDialog({
   });
   const [selectedDuration, setSelectedDuration] =
     useState<string>("Half month");
+  const [includeTransactions, setIncludeTransactions] = useState<boolean>(true);
 
   const months = [
     "January",
@@ -68,7 +76,7 @@ export function WhatsAppNotificationDialog({
       .replace(/\{month\}/g, selectedMonth)
       .replace(/\{year\}/g, selectedYear.toString())
       .replace(/\{duration\}/g, selectedDuration);
-    onSend(finalMessage, selectedMonth, selectedYear);
+    onSend(finalMessage, selectedMonth, selectedYear, includeTransactions);
   };
 
   return (
@@ -80,7 +88,7 @@ export function WhatsAppNotificationDialog({
             You can edit the message template that will be sent to the user.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-2">
+        <div className="space-y-4">
           <div className="text-xs text-muted-foreground">
             You can use <code>{"{name}"}</code>, <code>{"{balance}"}</code>,{" "}
             <code>{"{month}"}</code> and <code>{"{year}"}</code> as
@@ -140,6 +148,18 @@ export function WhatsAppNotificationDialog({
                 </SelectGroup>
               </SelectContent>
             </Select>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="include-transactions"
+              checked={includeTransactions}
+              onCheckedChange={(checked) =>
+                setIncludeTransactions(checked as boolean)
+              }
+            />
+            <Label htmlFor="include-transactions">
+              Include transaction history
+            </Label>
           </div>
           <Textarea
             rows={6}

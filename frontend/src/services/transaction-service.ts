@@ -492,7 +492,8 @@ export const transactionService = {
     employeeId: string,
     messageTemplate?: string,
     month?: string,
-    year?: number
+    year?: number,
+    includeTransactions = false
   ): Promise<{ success: boolean; message?: string }> {
     const response = await fetch(`${API_BASE}/whatsapp/notify/${employeeId}`, {
       method: "POST",
@@ -501,6 +502,7 @@ export const transactionService = {
         message_template: messageTemplate,
         month: month,
         year: year,
+        includeTransactions: includeTransactions,
       }),
     });
 
@@ -515,7 +517,8 @@ export const transactionService = {
   async sendAllBalanceNotifications(
     messageTemplate?: string,
     month?: string,
-    year?: number
+    year?: number,
+    includeTransactions = false
   ): Promise<{
     success: boolean;
     data?: {
@@ -534,7 +537,12 @@ export const transactionService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(
         messageTemplate
-          ? { message_template: messageTemplate, month: month, year: year }
+          ? {
+              message_template: messageTemplate,
+              month: month,
+              year: year,
+              includeTransactions: includeTransactions,
+            }
           : {}
       ),
     });

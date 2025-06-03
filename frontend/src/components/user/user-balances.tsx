@@ -40,7 +40,7 @@ import * as z from "zod";
 import { Button } from "../ui/button";
 import UserTransactions from "./user-transactions";
 
-import SendAllBalance from "@/components/send-all-banlance";
+import SendAllBalance from "@/components/send-all-balance";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,

@@ -1,4 +1,4 @@
-import SendAllBalance from "@/components/send-all-banlance";
+import SendAllBalance from "@/components/send-all-balance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -255,7 +255,8 @@ const DashboardPage = () => {
     employeeId: string,
     messageTemplate?: string,
     month?: string,
-    year?: number
+    year?: number,
+    includeTransactions?: boolean
   ) => {
     setSendingNotification(true);
     try {
@@ -263,7 +264,8 @@ const DashboardPage = () => {
         employeeId,
         messageTemplate,
         month,
-        year
+        year,
+        includeTransactions
       );
       if (response.success) {
         toast.success(
@@ -689,13 +691,14 @@ const DashboardPage = () => {
       <WhatsAppNotificationDialog
         open={notificationDialogOpen}
         onOpenChange={setNotificationDialogOpen}
-        onSend={(messageTemplate, month, year) => {
+        onSend={(messageTemplate, month, year, includeTransactions) => {
           if (selectedEmployeeId) {
             sendUserBalanceNotification(
               selectedEmployeeId,
               messageTemplate,
               month,
-              year
+              year,
+              includeTransactions
             );
           }
         }}

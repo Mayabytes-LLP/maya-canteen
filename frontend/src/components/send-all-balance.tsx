@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -9,6 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -28,7 +30,6 @@ export default function SendAllBalance() {
   const { whatsappStatus } = useContext(AppContext);
 
   const [allMessageDialogOpen, setAllMessageDialogOpen] = useState(false);
-  // Add state for month and year selection
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return now.toLocaleString("default", { month: "long" });
@@ -37,6 +38,7 @@ export default function SendAllBalance() {
     return new Date().getFullYear();
   });
   const [sendingAllNotifications, setSendingAllNotifications] = useState(false);
+  const [includeTransactions, setIncludeTransactions] = useState<boolean>(true);
 
   const [selectedDuration, setSelectedDuration] =
     useState<string>("Half month");
@@ -68,14 +70,16 @@ export default function SendAllBalance() {
   const sendAllBalanceNotifications = async (
     messageTemplate?: string,
     month?: string,
-    year?: number
+    year?: number,
+    includeTransactions?: boolean
   ) => {
     setSendingAllNotifications(true);
     try {
       const response = await transactionService.sendAllBalanceNotifications(
         messageTemplate,
         month,
-        year
+        year,
+        includeTransactions
       );
       if (response.success && response.data) {
         // Show success message with details
@@ -106,6 +110,7 @@ export default function SendAllBalance() {
       setSendingAllNotifications(false);
     }
   };
+
   return (
     <Dialog open={allMessageDialogOpen} onOpenChange={setAllMessageDialogOpen}>
       <DialogTrigger asChild>
@@ -132,7 +137,7 @@ export default function SendAllBalance() {
           message will be sent to all users with a balance.
         </DialogDescription>
         <DialogClose />
-        <div className="space-y-2">
+        <div className="space-y-4">
           <div className="text-xs text-muted-foreground">
             You can use <code>{"{name}"}</code>, <code>{"{balance}"}</code>,{" "}
             <code>{"{month}"}</code> and <code>{"{year}"}</code> as
@@ -193,6 +198,18 @@ export default function SendAllBalance() {
               </SelectContent>
             </Select>
           </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="include-transactions"
+              checked={includeTransactions}
+              onCheckedChange={(checked) =>
+                setIncludeTransactions(checked as boolean)
+              }
+            />
+            <Label htmlFor="include-transactions">
+              Include transaction history
+            </Label>
+          </div>
           <Textarea
             rows={6}
             value={allMessageTemplate}
@@ -210,7 +227,8 @@ export default function SendAllBalance() {
               sendAllBalanceNotifications(
                 finalMessage,
                 selectedMonth,
-                selectedYear
+                selectedYear,
+                includeTransactions
               );
               setAllMessageDialogOpen(false);
             }}
