@@ -144,24 +144,24 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 	}
 
 	// Format transaction history
-	csvContent, textContent := h.formatTransactionHistory(userTransactions)
+	// csvContent, textContent := h.formatTransactionHistory(userTransactions)
 
 	// Send the balance message
 	if err := h.SendWhatsAppMessage(user.Phone, message); err != nil {
 		return fmt.Errorf("failed to send balance message: %v", err)
 	}
 
-	// Send transaction history in text format
-	if err := h.SendWhatsAppMessage(user.Phone, textContent); err != nil {
-		return fmt.Errorf("failed to send transaction text: %v", err)
-	}
-
+	// // Send transaction history in text format
+	// if err := h.SendWhatsAppMessage(user.Phone, textContent); err != nil {
+	// 	return fmt.Errorf("failed to send transaction text: %v", err)
+	// }
+	//
 	// Send transaction history in CSV format
-	fileName := fmt.Sprintf("transactions_%s_%d.csv", startDate.Format("January"), startDate.Year())
-	if err := h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent), "text/csv"); err != nil {
-		return fmt.Errorf("failed to send transaction CSV: %v", err)
-	}
-
+	// fileName := fmt.Sprintf("transactions_%s_%d.csv", startDate.Format("January"), startDate.Year())
+	// if err := h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent), "text/csv"); err != nil {
+	// 	return fmt.Errorf("failed to send transaction CSV: %v", err)
+	// }
+	//
 	return nil
 }
 
