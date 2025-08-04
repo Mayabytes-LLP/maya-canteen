@@ -16,7 +16,7 @@ import (
 
 // WhatsAppClient interface allows us to interact with the WhatsApp client
 type WhatsAppClient interface {
-	Logout() error
+	Logout(ctx context.Context) error
 	Connect() error
 	IsConnected() bool
 }
