@@ -57,6 +57,28 @@ func NewWebSocketHandler(db database.Service, client WhatsAppClient) *WebsocketH
 	}
 }
 
+// getWhatsAppClientInfo returns a summary of the WhatsApp client (platform, user, version, etc.)
+func (h *WebsocketHandler) getWhatsAppClientInfo() map[string]any {
+	info := map[string]any{}
+	client, ok := h.whatsappClient.(*whatsmeow.Client)
+	if !ok || client == nil {
+		info["status"] = "not_initialized"
+		return info
+	}
+	// Platform and user info
+	if client.Store != nil && client.Store.ID != nil {
+		info["platform"] = client.Store.ID.Device
+		info["user"] = client.Store.ID.User
+	}
+	// Version info (if available)
+	if client.Store != nil && client.Store.PushName != "" {
+		info["push_name"] = client.Store.PushName
+	}
+	// Add more fields as needed (e.g., connected, etc.)
+	info["connected"] = client.IsConnected()
+	return info
+}
+
 // RegisterQRChannelGetter sets the function to get a QR channel
 func (h *WebsocketHandler) RegisterQRChannelGetter(getter QRChannelGetter) {
 	h.getQRChannel = getter
@@ -138,8 +160,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	if h.whatsappClient == nil {
 		log.Println("WhatsApp client not initialized")
 		h.Broadcast("whatsapp_status", map[string]any{
-			"status":  "disconnected",
-			"message": "WhatsApp client not initialized",
+			"status":      "disconnected",
+			"message":     "WhatsApp client not initialized",
+			"client_info": h.getWhatsAppClientInfo(),
 		})
 		return
 	}
@@ -178,15 +201,17 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 		// Credentials are stored, try to connect directly
 		log.Println("WhatsApp credentials found, connecting directly...")
 		h.Broadcast("whatsapp_status", map[string]any{
-			"status":  "connecting",
-			"message": "Connecting to WhatsApp with stored credentials...",
+			"status":      "connecting",
+			"message":     "Connecting to WhatsApp with stored credentials...",
+			"client_info": h.getWhatsAppClientInfo(),
 		})
 
 		if h.whatsappClient.IsConnected() {
 			log.Println("WhatsApp login successful (with stored credentials)")
 			h.Broadcast("whatsapp_status", map[string]any{
-				"status":  "connected",
-				"message": "WhatsApp login successful",
+				"status":      "connected",
+				"message":     "WhatsApp login successful",
+				"client_info": h.getWhatsAppClientInfo(),
 			})
 			h.Broadcast("whatsapp_qr", map[string]any{
 				"qr_code_base64": "",
@@ -198,8 +223,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			if err := h.whatsappClient.Connect(); err != nil {
 				log.Printf("Failed to connect to WhatsApp: %v", err)
 				h.Broadcast("whatsapp_status", map[string]any{
-					"status":  "disconnected",
-					"message": "Connection failed: " + err.Error(),
+					"status":      "disconnected",
+					"message":     "Connection failed: " + err.Error(),
+					"client_info": h.getWhatsAppClientInfo(),
 				})
 				return
 			}
@@ -208,8 +234,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			if h.whatsappClient.IsConnected() {
 				log.Println("WhatsApp login successful (with stored credentials)")
 				h.Broadcast("whatsapp_status", map[string]any{
-					"status":  "connected",
-					"message": "WhatsApp login successful",
+					"status":      "connected",
+					"message":     "WhatsApp login successful",
+					"client_info": h.getWhatsAppClientInfo(),
 				})
 				h.Broadcast("whatsapp_qr", map[string]any{
 					"qr_code_base64": "",
@@ -218,8 +245,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			} else {
 				log.Println("WhatsApp connection failed (with stored credentials)")
 				h.Broadcast("whatsapp_status", map[string]any{
-					"status":  "disconnected",
-					"message": "Failed to connect with stored credentials. Please try again.",
+					"status":      "disconnected",
+					"message":     "Failed to connect with stored credentials. Please try again.",
+					"client_info": h.getWhatsAppClientInfo(),
 				})
 			}
 		}()
@@ -230,8 +258,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	if h.whatsappClient.IsConnected() {
 		log.Println("WhatsApp is already connected")
 		h.Broadcast("whatsapp_status", map[string]any{
-			"status":  "connected",
-			"message": "WhatsApp is already connected",
+			"status":      "connected",
+			"message":     "WhatsApp is already connected",
+			"client_info": h.getWhatsAppClientInfo(),
 		})
 		h.Broadcast("whatsapp_qr", map[string]any{
 			"qr_code_base64": "",
@@ -242,8 +271,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 
 	log.Println("Attempting to connect to WhatsApp...")
 	h.Broadcast("whatsapp_status", map[string]any{
-		"status":  "disconnected",
-		"message": "Connecting to WhatsApp...",
+		"status":      "disconnected",
+		"message":     "Connecting to WhatsApp...",
+		"client_info": h.getWhatsAppClientInfo(),
 	})
 
 	// Create a context that can be cancelled

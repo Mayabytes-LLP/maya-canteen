@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	defaultBalanceMessageTemplate = "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) half month of Canteen bill\n\nThis is an automated message from Maya Canteen Management System."
+	defaultBalanceMessageTemplate = "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) {duration} of Canteen bill for {month} {year}\n\nThis is an automated message from Maya Canteen Management System.\n\nAfter the payment share the screenshot.\n\n{transactions}"
 	csvHeader                     = "Date,Type,Amount,Description\n"
 	textTransactionHeader         = "Transaction History:\n"
 	textTransactionHeaderLine     = "Date | Type | Amount | Description\n"
@@ -73,12 +73,24 @@ func (h *WhatsAppHandler) getWhatsAppRecipient(phoneNumber string) (types.JID, e
 
 // SendWhatsAppMessage sends a message to a user's WhatsApp number
 func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error {
+	log.WithFields(log.Fields{
+		"phoneNumber": phoneNumber,
+		"message":     message,
+	}).Info("SendWhatsAppMessage called with params")
+
 	recipient, err := h.getWhatsAppRecipient(phoneNumber)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"phoneNumber": phoneNumber,
+			"error":       err,
+		}).Warn("getWhatsAppRecipient failed")
 		return err
 	}
 
-	log.Infof("Sending WhatsApp message to %s: %s", recipient, message)
+	log.WithFields(log.Fields{
+		"recipient": recipient.String(),
+		"message":   message,
+	}).Info("Sending WhatsApp message")
 
 	// Create message with current timestamp
 	msg := &waProto.Message{
@@ -94,9 +106,17 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 	client := h.GetWhatsAppClient()
 	_, err = client.SendMessage(ctx, recipient, msg)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"recipient": recipient.String(),
+			"error":     err,
+		}).Error("Failed to send WhatsApp message")
 		return fmt.Errorf("failed to send WhatsApp message: %v", err)
 	}
 
+	log.WithFields(log.Fields{
+		"recipient": recipient.String(),
+		"status":    "sent",
+	}).Info("WhatsApp message sent successfully")
 	return nil
 }
 
@@ -145,16 +165,31 @@ func (h *WhatsAppHandler) formatTransactionHistory(transactions []models.Transac
 
 // sendBalanceNotification sends a balance notification to a single user
 func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance models.UserBalance, messageTemplate string, startDate, endDate time.Time, includeTransactions bool) error {
-	// Format balance message
+	log.WithFields(log.Fields{
+		"user_id":             user.ID,
+		"user_name":           user.Name,
+		"user_phone":          user.Phone,
+		"user_balance":        userBalance.Balance,
+		"messageTemplate":     messageTemplate,
+		"startDate":           startDate,
+		"endDate":             endDate,
+		"includeTransactions": includeTransactions,
+	}).Info("sendBalanceNotification called with params")
+
 	message := h.formatBalanceMessage(messageTemplate, user.Name, float64(userBalance.Balance))
 
 	var combinedMessage string
 	var csvContent string
+	var textContent string
 
 	if includeTransactions {
 		// Get transactions for the period
 		transactions, err := h.DB.GetTransactionsByDateRange(startDate, endDate)
 		if err != nil {
+			log.WithFields(log.Fields{
+				"user_id": user.ID,
+				"error":   err,
+			}).Error("Failed to get transactions for user in sendBalanceNotification")
 			return fmt.Errorf("failed to get transactions: %v", err)
 		}
 
@@ -166,29 +201,73 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 			}
 		}
 
-		var textContent string
+		log.WithFields(log.Fields{
+			"user_id":           user.ID,
+			"user_name":         user.Name,
+			"transaction_count": len(userTransactions),
+			"transactions":      userTransactions,
+		}).Info("User transactions for sendBalanceNotification")
+
 		if len(userTransactions) > 0 {
+			log.Infof("Found %d transactions for user %s (%d) in the period %s to %s", len(userTransactions), user.Name, user.ID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 			csvContent, textContent = h.formatTransactionHistory(userTransactions)
 		} else {
+			log.Infof("No transactions found for user %s (%d) in the period %s to %s", user.Name, user.ID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 			csvContent = ""
 			textContent = "No transactions found for this period."
 		}
+	} else {
+		log.Infof("Skipping transaction history for user %s (%d)", user.Name, user.ID)
+		csvContent = ""
+		textContent = ""
+	}
 
-		// Combine balance message with transaction history (text)
+	// Always replace {transactions} if present, even if textContent is empty
+	if strings.Contains(message, "{transactions}") {
+		combinedMessage = strings.ReplaceAll(message, "{transactions}", textContent)
+	} else if includeTransactions && textContent != "" {
 		combinedMessage = message + "\n\n" + textContent
 	} else {
 		combinedMessage = message
 	}
 
+	log.WithFields(log.Fields{
+		"user_id":            user.ID,
+		"user_name":          user.Name,
+		"user_phone":         user.Phone,
+		"final_message":      combinedMessage,
+		"csvContent_present": csvContent != "",
+	}).Info("Final WhatsApp message before sending")
+
 	// Always send the combined message (balance + transaction history if included)
 	if err := h.SendWhatsAppMessage(user.Phone, combinedMessage); err != nil {
+		log.WithFields(log.Fields{
+			"user_id":    user.ID,
+			"user_name":  user.Name,
+			"user_phone": user.Phone,
+			"error":      err,
+		}).Error("Failed to send WhatsApp message in sendBalanceNotification")
 		return fmt.Errorf("failed to send WhatsApp message: %v", err)
 	}
 
 	// If there are transactions and includeTransactions is true, send the CSV as a document (as a second message)
 	if includeTransactions && csvContent != "" {
 		fileName := fmt.Sprintf("transactions_%s_%d.csv", startDate.Format("January"), startDate.Year())
+		log.WithFields(log.Fields{
+			"user_id":    user.ID,
+			"user_name":  user.Name,
+			"user_phone": user.Phone,
+			"fileName":   fileName,
+			"csvContent": csvContent,
+		}).Info("Sending WhatsApp CSV document")
 		if err := h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent), "text/csv"); err != nil {
+			log.WithFields(log.Fields{
+				"user_id":    user.ID,
+				"user_name":  user.Name,
+				"user_phone": user.Phone,
+				"fileName":   fileName,
+				"error":      err,
+			}).Error("Failed to send transaction CSV in sendBalanceNotification")
 			return fmt.Errorf("failed to send transaction CSV: %v", err)
 		}
 	}
@@ -378,17 +457,36 @@ func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.
 
 // SendDocumentMessage sends a document message to a user's WhatsApp number
 func (h *WhatsAppHandler) SendDocumentMessage(phoneNumber string, fileName string, fileData []byte, mimeType string) error {
+	log.WithFields(log.Fields{
+		"phoneNumber":  phoneNumber,
+		"fileName":     fileName,
+		"mimeType":     mimeType,
+		"fileData_len": len(fileData),
+	}).Info("SendDocumentMessage called with params")
+
 	recipient, err := h.getWhatsAppRecipient(phoneNumber)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"phoneNumber": phoneNumber,
+			"error":       err,
+		}).Warn("getWhatsAppRecipient failed in SendDocumentMessage")
 		return err
 	}
 
-	log.Infof("Sending WhatsApp document to %s: %s", recipient, fileName)
+	log.WithFields(log.Fields{
+		"recipient": recipient.String(),
+		"fileName":  fileName,
+	}).Info("Sending WhatsApp document")
 
 	client := h.GetWhatsAppClient()
 	// Upload the file to WhatsApp servers
 	uploaded, err := client.Upload(context.Background(), fileData, whatsmeow.MediaDocument)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"recipient": recipient.String(),
+			"fileName":  fileName,
+			"error":     err,
+		}).Error("Failed to upload document in SendDocumentMessage")
 		return fmt.Errorf("failed to upload document: %v", err)
 	}
 
@@ -412,8 +510,18 @@ func (h *WhatsAppHandler) SendDocumentMessage(phoneNumber string, fileName strin
 
 	_, err = client.SendMessage(ctx, recipient, msg)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"recipient": recipient.String(),
+			"fileName":  fileName,
+			"error":     err,
+		}).Error("Failed to send WhatsApp document in SendDocumentMessage")
 		return fmt.Errorf("failed to send WhatsApp document: %v", err)
 	}
 
+	log.WithFields(log.Fields{
+		"recipient": recipient.String(),
+		"fileName":  fileName,
+		"status":    "sent",
+	}).Info("WhatsApp document sent successfully")
 	return nil
 }

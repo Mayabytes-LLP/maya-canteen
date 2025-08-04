@@ -19,6 +19,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_WHATSAPP_MESSAGE_TEMPLATE } from "@/constants/whatsapp-message-template";
 
 interface WhatsAppNotificationDialogProps {
 	open: boolean;
@@ -38,9 +39,9 @@ export function WhatsAppNotificationDialog({
 	onSend,
 	sendingNotification,
 }: WhatsAppNotificationDialogProps) {
-	const [messageTemplate, setMessageTemplate] = useState<string>(() => {
-		return "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) {duration} of Canteen bill for {month} {year}\n\nThis is an automated message from Maya Canteen Management System.";
-	});
+	const [messageTemplate, setMessageTemplate] = useState<string>(
+		() => DEFAULT_WHATSAPP_MESSAGE_TEMPLATE,
+	);
 	const [selectedMonth, setSelectedMonth] = useState<string>(() => {
 		const now = new Date();
 		return now.toLocaleString("default", { month: "long" });
