@@ -8,7 +8,6 @@ import (
 	"maya-canteen/internal/handlers/common"
 	"maya-canteen/internal/models"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -197,14 +196,171 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 	return nil
 }
 
-func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Request) {
+// parseBalanceNotificationRequest parses the request body and returns message template, startDate, endDate, and includeTransactions
+func parseBalanceNotificationRequest(r *http.Request) (string, time.Time, time.Time, bool, error) {
+	const defaultTemplate = defaultBalanceMessageTemplate
+	type reqBody struct {
+		MessageTemplate     string `json:"message_template"`
+		Month               string `json:"month"`
+		Year                int    `json:"year"`
+		IncludeTransactions bool   `json:"include_transactions"`
+	}
+	var body reqBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		return "", time.Time{}, time.Time{}, false, fmt.Errorf("invalid request body: %w", err)
+	}
+	messageTemplate := body.MessageTemplate
+	if messageTemplate == "" {
+		messageTemplate = defaultTemplate
+	}
+	month := body.Month
+	year := body.Year
+	if month == "" {
+		month = time.Now().Format("January")
+	}
+	if year == 0 {
+		year = time.Now().Year()
+	}
+	startDate, err := time.Parse("January 2006", fmt.Sprintf("%s %d", month, year))
+	if err != nil {
+		return "", time.Time{}, time.Time{}, false, fmt.Errorf("invalid month format: %w", err)
+	}
+	endDate := startDate.AddDate(0, 1, 0).Add(-time.Second)
+	return messageTemplate, startDate, endDate, body.IncludeTransactions, nil
+}
+
+// sendBalanceNotifications sends notifications to a slice of users and returns success/fail counts and details
+func sendBalanceNotifications(
+	h *WhatsAppHandler,
+	users []models.User,
+	balances []models.UserBalance,
+	messageTemplate string,
+	startDate, endDate time.Time,
+	includeTransactions bool,
+	delay time.Duration,
+) (successCount int, failCount int, failedUsers []string) {
+	if len(users) != len(balances) {
+		log.Errorf("users and balances slices have different lengths: %d vs %d", len(users), len(balances))
+		failCount = len(users)
+		for _, user := range users {
+			failedUsers = append(failedUsers, fmt.Sprintf("%s (internal error: mismatched slices)", user.Name))
+		}
+		return
+	}
+
+	for i, user := range users {
+		userBalance := balances[i]
+		if user.Phone == "" {
+			failCount++
+			failedUsers = append(failedUsers, fmt.Sprintf("%s (no phone number)", user.Name))
+			continue
+		}
+		err := h.sendBalanceNotification(user, userBalance, messageTemplate, startDate, endDate, includeTransactions)
+		if err != nil {
+			log.Printf("Failed to send WhatsApp notification to %s (%s): %v", user.Name, user.Phone, err)
+			failCount++
+			failedUsers = append(failedUsers, fmt.Sprintf("%s (%v)", user.Name, err))
+		} else {
+			successCount++
+		}
+		if delay > 0 && i < len(users)-1 {
+			time.Sleep(delay)
+		}
+	}
+	return
+}
+
+// notifyUserBalances is a modular handler for sending WhatsApp notifications to one or all users.
+// If employeeID is 0, it sends to all users; otherwise, to the specified user.
+func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Request, employeeID int64) {
 	client := h.GetWhatsAppClient()
 	if client == nil || !client.IsLoggedIn() || !client.IsConnected() {
-		log.Warn("Attempted to notify user balance, but WhatsApp client is not available")
+		log.Warn("WhatsApp client is not available")
 		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not available")
 		return
 	}
 
+	// Parse request body and date range
+	messageTemplate, startDate, endDate, includeTransactions, err := parseBalanceNotificationRequest(r)
+	if err != nil {
+		log.Errorf("Failed to parse notification request: %v", err)
+		common.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var users []models.User
+	var balances []models.UserBalance
+	var notificationDelayToUse time.Duration = 0
+	var target string
+
+	if employeeID != 0 {
+		// Single user
+		user, err := h.DB.GetUser(employeeID)
+		if err != nil {
+			log.Errorf("User with employee ID %d not found: %v", employeeID, err)
+			common.RespondWithError(w, http.StatusNotFound, fmt.Sprintf("User with employee ID %d not found", employeeID))
+			return
+		}
+		if user.Phone == "" {
+			log.Warnf("User with employee ID %d does not have a phone number", employeeID)
+			common.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("User with employee ID %d does not have a phone number", employeeID))
+			return
+		}
+		userBalance, err := h.DB.GetUserBalanceByUserID(user.ID)
+		if err != nil {
+			log.Errorf("Failed to get user balance for user ID %d: %v", user.ID, err)
+			common.RespondWithError(w, http.StatusInternalServerError, "Failed to get user balance")
+			return
+		}
+		users = []models.User{*user}
+		balances = []models.UserBalance{userBalance}
+		target = user.Name
+	} else {
+		// All users
+		userBalances, err := h.DB.GetUsersBalances()
+		if err != nil {
+			log.Errorf("Failed to get all user balances: %v", err)
+			common.RespondWithError(w, http.StatusInternalServerError, "Failed to get users' balances")
+			return
+		}
+		for _, balance := range userBalances {
+			if !balance.UserActive || balance.Phone == "" {
+				continue
+			}
+			users = append(users, models.User{
+				ID:    balance.UserID,
+				Name:  balance.UserName,
+				Phone: balance.Phone,
+			})
+			balances = append(balances, models.UserBalance{
+				Balance: balance.Balance,
+			})
+		}
+		notificationDelayToUse = notificationDelay
+		target = "all users"
+	}
+
+	successCount, failCount, failedUsers := sendBalanceNotifications(h, users, balances, messageTemplate, startDate, endDate, includeTransactions, notificationDelayToUse)
+
+	// Consistent response structure for both single and all
+	resp := map[string]any{
+		"success": failCount == 0,
+		"message": fmt.Sprintf("Sent %d notification(s) to %s, %d failed", successCount, target, failCount),
+		"details": map[string]any{
+			"success_count": successCount,
+			"fail_count":    failCount,
+			"failed_users":  failedUsers,
+		},
+	}
+	status := http.StatusOK
+	if failCount > 0 {
+		status = http.StatusInternalServerError
+	}
+	common.RespondWithJSON(w, status, resp)
+}
+
+// NotifyUserBalance handles sending WhatsApp notification to a single user
+func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	employeeID, err := h.ParseID(vars, "id")
 	if err != nil {
@@ -212,183 +368,12 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 		common.RespondWithError(w, http.StatusBadRequest, "Employee ID is required")
 		return
 	}
-
-	// Get user and balance information
-	user, err := h.DB.GetUser(employeeID)
-	if err != nil {
-		log.Errorf("User with employee ID %s not found: %v", strconv.FormatInt(employeeID, 10), err)
-		common.RespondWithError(w, http.StatusNotFound, fmt.Sprintf("User with employee ID %s not found", strconv.FormatInt(employeeID, 10)))
-		return
-	}
-
-	if user.Phone == "" {
-		log.Warnf("User with employee ID %s does not have a phone number", strconv.FormatInt(employeeID, 10))
-		common.RespondWithError(w, http.StatusBadRequest, fmt.Sprintf("User with employee ID %s does not have a phone number", strconv.FormatInt(employeeID, 10)))
-		return
-	}
-
-	userBalance, err := h.DB.GetUserBalanceByUserID(user.ID)
-	if err != nil {
-		log.Errorf("Failed to get user balance for user ID %d: %v", user.ID, err)
-		common.RespondWithError(w, http.StatusInternalServerError, "Failed to get user balance")
-		return
-	}
-
-	// Parse request body
-	type reqBody struct {
-		MessageTemplate     string `json:"message_template"`
-		Month               string `json:"month"`
-		Year                int    `json:"year"`
-		IncludeTransactions bool   `json:"include_transactions"`
-	}
-	var body reqBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		log.Errorf("Failed to decode request body: %v", err)
-		common.RespondWithError(w, http.StatusBadRequest, "Invalid request body")
-		return
-	}
-
-	messageTemplate := body.MessageTemplate
-	if messageTemplate == "" {
-		messageTemplate = defaultBalanceMessageTemplate
-	}
-
-	// Set up date range
-	month := body.Month
-	year := body.Year
-	if month == "" {
-		month = time.Now().Format("January")
-	}
-	if year == 0 {
-		year = time.Now().Year()
-	}
-
-	startDate, err := time.Parse("January 2006", fmt.Sprintf("%s %d", month, year))
-	if err != nil {
-		log.Errorf("Invalid month format provided: %s %d", month, year)
-		common.RespondWithError(w, http.StatusBadRequest, "Invalid month format")
-		return
-	}
-	endDate := startDate.AddDate(0, 1, 0).Add(-time.Second)
-
-	// Send notification
-	if err := h.sendBalanceNotification(*user, userBalance, messageTemplate, startDate, endDate, body.IncludeTransactions); err != nil {
-		log.Errorf("Failed to send notification to user %d: %v", user.ID, err)
-		common.RespondWithError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to send notification: %v", err))
-		return
-	}
-
-	common.RespondWithJSON(w, http.StatusOK, map[string]any{
-		"success": true,
-		"message": fmt.Sprintf("Balance notification sent to %s", user.Name),
-	})
+	h.notifyUserBalances(w, r, employeeID)
 }
 
+// NotifyAllUsersBalances handles sending WhatsApp notifications to all users
 func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.Request) {
-	client := h.GetWhatsAppClient()
-	if client == nil || !client.IsLoggedIn() || !client.IsConnected() {
-		log.Warn("Attempted to notify all users, but WhatsApp client is not available")
-		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not available")
-		return
-	}
-
-	// Parse request body
-	type reqBody struct {
-		MessageTemplate     string `json:"message_template"`
-		Month               string `json:"month"`
-		Year                int    `json:"year"`
-		IncludeTransactions bool   `json:"include_transactions"`
-	}
-	var body reqBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		log.Errorf("Failed to decode request body for notifying all users: %v", err)
-		common.RespondWithError(w, http.StatusBadRequest, "Invalid request body")
-		return
-	}
-
-	messageTemplate := body.MessageTemplate
-	if messageTemplate == "" {
-		messageTemplate = defaultBalanceMessageTemplate
-	}
-
-	// Set up date range
-	month := body.Month
-	year := body.Year
-	if month == "" {
-		month = time.Now().Format("January")
-	}
-	if year == 0 {
-		year = time.Now().Year()
-	}
-
-	startDate, err := time.Parse("January 2006", fmt.Sprintf("%s %d", month, year))
-	if err != nil {
-		log.Errorf("Invalid month format provided for notifying all users: %s %d", month, year)
-		common.RespondWithError(w, http.StatusBadRequest, "Invalid month format")
-		return
-	}
-	endDate := startDate.AddDate(0, 1, 0).Add(-time.Second)
-
-	// Get all users with balances
-	userBalances, err := h.DB.GetUsersBalances()
-	if err != nil {
-		log.Errorf("Failed to get all user balances: %v", err)
-		common.RespondWithError(w, http.StatusInternalServerError, "Failed to get user's balance")
-		return
-	}
-
-	successCount := 0
-	failCount := 0
-	failedUsers := []string{}
-
-	// Create a map to track processed users to avoid duplicates
-	processedUsers := make(map[int64]bool)
-
-	// Send notification to each user
-	for _, balance := range userBalances {
-		// Skip if user is already processed
-		if processedUsers[balance.UserID] {
-			continue
-		}
-		processedUsers[balance.UserID] = true
-
-		if !balance.UserActive || balance.Phone == "" {
-			failCount++
-			failedUsers = append(failedUsers, fmt.Sprintf("%s (inactive or no phone number)", balance.UserName))
-			continue
-		}
-
-		user := models.User{
-			ID:    balance.UserID,
-			Name:  balance.UserName,
-			Phone: balance.Phone,
-		}
-
-		userBalance := models.UserBalance{
-			Balance: balance.Balance,
-		}
-
-		if err := h.sendBalanceNotification(user, userBalance, messageTemplate, startDate, endDate, body.IncludeTransactions); err != nil {
-			log.Printf("Failed to send WhatsApp notification to %s (%s): %v", balance.UserName, balance.Phone, err)
-			failCount++
-			failedUsers = append(failedUsers, fmt.Sprintf("%s (%v)", balance.UserName, err))
-		} else {
-			successCount++
-		}
-
-		// Add a small delay between messages to avoid rate limiting
-		time.Sleep(notificationDelay)
-	}
-
-	common.RespondWithJSON(w, http.StatusOK, map[string]any{
-		"success": true,
-		"message": fmt.Sprintf("Sent %d notifications, %d failed", successCount, failCount),
-		"details": map[string]any{
-			"success_count": successCount,
-			"fail_count":    failCount,
-			"failed_users":  failedUsers,
-		},
-	})
+	h.notifyUserBalances(w, r, 0)
 }
 
 // SendDocumentMessage sends a document message to a user's WhatsApp number
