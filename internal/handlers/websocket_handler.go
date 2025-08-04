@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/handlers/common"
@@ -24,16 +26,27 @@ type WhatsAppClient interface {
 // QRChannelGetter is a function type that gets a QR channel from the WhatsApp client
 type QRChannelGetter func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error)
 
+type ClientInfo struct {
+	Conn       *websocket.Conn
+	LastPing   time.Time
+	ID         string
+	UserAgent  string
+	RemoteAddr string
+}
+
 type WebsocketHandler struct {
 	common.BaseHandler
 	upgrader             websocket.Upgrader
-	clients              map[*websocket.Conn]bool
-	mu                   sync.Mutex
+	clients              map[string]*ClientInfo // Changed to map with client ID
+	clientsByConn        map[*websocket.Conn]string // Reverse lookup
+	mu                   sync.RWMutex     // Use RWMutex for better performance
 	latestWhatsappQR     string          // Store the latest WhatsApp QR code
 	whatsappClient       WhatsAppClient  // Store reference to WhatsApp client
 	getQRChannel         QRChannelGetter // Function to get a QR channel
 	connectionInProgress bool            // Flag to prevent multiple connection attempts
 	qrTimeout            *time.Timer     // Timer to cancel QR refresh after timeout
+	healthTicker         *time.Ticker    // Health check ticker
+	shutdownChan         chan struct{}   // Shutdown signal
 }
 
 type WSMessage struct {
@@ -42,7 +55,7 @@ type WSMessage struct {
 }
 
 func NewWebSocketHandler(db database.Service, client WhatsAppClient) *WebsocketHandler {
-	return &WebsocketHandler{
+	handler := &WebsocketHandler{
 		BaseHandler: common.NewBaseHandler(db),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -51,9 +64,112 @@ func NewWebSocketHandler(db database.Service, client WhatsAppClient) *WebsocketH
 				return true // Allow all origins for development
 			},
 		},
-		clients:              make(map[*websocket.Conn]bool),
+		clients:              make(map[string]*ClientInfo),
+		clientsByConn:        make(map[*websocket.Conn]string),
 		connectionInProgress: false,
 		whatsappClient:       client,
+		shutdownChan:         make(chan struct{}),
+	}
+
+	// Start health check routine
+	handler.startHealthCheck()
+
+	return handler
+}
+
+// generateClientID generates a unique client ID
+func (h *WebsocketHandler) generateClientID() string {
+	bytes := make([]byte, 16)
+	rand.Read(bytes)
+	return hex.EncodeToString(bytes)
+}
+
+// startHealthCheck starts the health monitoring routine
+func (h *WebsocketHandler) startHealthCheck() {
+	h.healthTicker = time.NewTicker(30 * time.Second)
+	go func() {
+		for {
+			select {
+			case <-h.healthTicker.C:
+				h.checkConnectionHealth()
+			case <-h.shutdownChan:
+				h.healthTicker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+// checkConnectionHealth checks and cleans up stale connections
+func (h *WebsocketHandler) checkConnectionHealth() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	now := time.Now()
+	var deadClients []string
+
+	for clientID, client := range h.clients {
+		// Check if client hasn't responded to ping in over 60 seconds
+		if now.Sub(client.LastPing) > 60*time.Second {
+			log.Printf("Client %s appears to be dead, removing", clientID)
+			client.Conn.Close()
+			deadClients = append(deadClients, clientID)
+		}
+	}
+
+	// Clean up dead clients
+	for _, clientID := range deadClients {
+		h.removeClient(clientID)
+	}
+
+	log.Printf("Health check complete. Active connections: %d", len(h.clients))
+}
+
+// addClient adds a new client connection
+func (h *WebsocketHandler) addClient(conn *websocket.Conn, r *http.Request) string {
+	clientID := h.generateClientID()
+	client := &ClientInfo{
+		Conn:       conn,
+		LastPing:   time.Now(),
+		ID:         clientID,
+		UserAgent:  r.Header.Get("User-Agent"),
+		RemoteAddr: r.RemoteAddr,
+	}
+
+	h.mu.Lock()
+	h.clients[clientID] = client
+	h.clientsByConn[conn] = clientID
+	h.mu.Unlock()
+
+	log.Printf("Client %s connected from %s. Total connections: %d",
+		clientID, r.RemoteAddr, len(h.clients))
+
+	return clientID
+}
+
+// removeClient removes a client connection
+func (h *WebsocketHandler) removeClient(clientID string) {
+	if client, exists := h.clients[clientID]; exists {
+		delete(h.clientsByConn, client.Conn)
+		delete(h.clients, clientID)
+		log.Printf("Client %s disconnected. Total connections: %d",
+			clientID, len(h.clients))
+	}
+}
+
+// getClientByConn gets client ID by connection
+func (h *WebsocketHandler) getClientByConn(conn *websocket.Conn) string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.clientsByConn[conn]
+}
+
+// updateClientPing updates the last ping time for a client
+func (h *WebsocketHandler) updateClientPing(clientID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if client, exists := h.clients[clientID]; exists {
+		client.LastPing = time.Now()
 	}
 }
 
@@ -92,20 +208,35 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		conn.Close()
+		// Clean up client when connection closes
+		clientID := h.getClientByConn(conn)
+		if clientID != "" {
+			h.mu.Lock()
+			h.removeClient(clientID)
+			h.mu.Unlock()
+		}
+	}()
 
-	h.mu.Lock()
-	h.clients[conn] = true
-	h.mu.Unlock()
+	// Add client with tracking info
+	clientID := h.addClient(conn, r)
+
 	// Send initial connection message
 	msg := WSMessage{
 		Type:    "connected",
-		Payload: "WebSocket connection established",
+		Payload: map[string]interface{}{
+			"message":   "WebSocket connection established",
+			"client_id": clientID,
+		},
 	}
 	if err := conn.WriteJSON(msg); err != nil {
 		log.Printf("Write error: %v", err)
 		return
 	}
+
+	// Send connection status broadcast
+	h.BroadcastConnectionStatus()
 
 	// Keep connection alive with ping/pong
 	ticker := time.NewTicker(30 * time.Second)
@@ -114,42 +245,41 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ticker.C:
+			h.updateClientPing(clientID)
 			if err := conn.WriteJSON(WSMessage{Type: "ping"}); err != nil {
-				log.Printf("Ping error: %v", err)
+				log.Printf("Ping error for client %s: %v", clientID, err)
 				return
 			}
 		default:
 			_, message, err := conn.ReadMessage()
 			if err != nil {
 				if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-					log.Printf("WebSocket read error: %v", err)
+					log.Printf("WebSocket read error for client %s: %v", clientID, err)
 				}
-				h.mu.Lock()
-				delete(h.clients, conn)
-				h.mu.Unlock()
 				return
 			}
 
 			// Handle incoming messages
 			var wsMsg WSMessage
 			if err := json.Unmarshal(message, &wsMsg); err != nil {
-				log.Printf("Message parse error: %v", err)
+				log.Printf("Message parse error from client %s: %v", clientID, err)
 				continue
 			}
 
 			// Handle different message types
 			switch wsMsg.Type {
-			case "ping":
-				// Client is alive
-				log.Printf("Received ping message")
+			case "ping", "pong":
+				// Client is alive, update ping time
+				h.updateClientPing(clientID)
+				log.Printf("Received %s from client %s", wsMsg.Type, clientID)
 				continue
 			case "refresh_whatsapp":
 				// Client requested a WhatsApp refresh
-				log.Printf("Received WhatsApp refresh request")
+				log.Printf("Received WhatsApp refresh request from client %s", clientID)
 				h.handleWhatsAppRefresh()
 				continue
 			default:
-				log.Printf("Unknown message type: %s", wsMsg.Type)
+				log.Printf("Unknown message type '%s' from client %s", wsMsg.Type, clientID)
 			}
 		}
 	}
@@ -371,8 +501,8 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 }
 
 func (h *WebsocketHandler) Broadcast(msgType string, payload any) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
+	h.mu.RLock()
+	defer h.mu.RUnlock()
 
 	// If this is a WhatsApp QR code broadcast, store the latest code
 	if msgType == "whatsapp_qr" {
@@ -391,35 +521,93 @@ func (h *WebsocketHandler) Broadcast(msgType string, payload any) {
 		Payload: payload,
 	}
 
-	deadClients := []*websocket.Conn{}
+	var deadClients []string
 
-	log.Printf("Broadcasting message: %v", message)
-	log.Printf("Number of connected clients: %d", len(h.clients))
-	// list all the clients and send the message to each of them
-	for client := range h.clients {
-		if err := client.WriteJSON(message); err != nil {
-			log.Printf("WebSocket write error: %v", err)
-			client.Close()
-			deadClients = append(deadClients, client)
+	log.Printf("Broadcasting message type '%s' to %d clients", msgType, len(h.clients))
+
+	// Send message to all connected clients
+	for clientID, client := range h.clients {
+		if err := client.Conn.WriteJSON(message); err != nil {
+			log.Printf("WebSocket write error to client %s: %v", clientID, err)
+			client.Conn.Close()
+			deadClients = append(deadClients, clientID)
 		}
 	}
 
-	// Clean up dead clients
-	for _, client := range deadClients {
-		delete(h.clients, client)
+	// Clean up dead clients (need to re-acquire write lock)
+	if len(deadClients) > 0 {
+		h.mu.RUnlock() // Release read lock
+		h.mu.Lock()    // Acquire write lock
+		for _, clientID := range deadClients {
+			h.removeClient(clientID)
+		}
+		h.mu.Unlock()
+		h.mu.RLock() // Re-acquire read lock for defer
 	}
 }
 
-// Clean up any resources when the handler is being destroyed
+// BroadcastConnectionStatus broadcasts the current connection status
+func (h *WebsocketHandler) BroadcastConnectionStatus() {
+	h.mu.RLock()
+	connectionCount := len(h.clients)
+	h.mu.RUnlock()
+
+	h.Broadcast("connection_status", map[string]interface{}{
+		"total_connections": connectionCount,
+		"timestamp":        time.Now().Unix(),
+	})
+}
+
+// GetConnectionStats returns statistics about current connections
+func (h *WebsocketHandler) GetConnectionStats() map[string]interface{} {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	stats := map[string]interface{}{
+		"total_connections": len(h.clients),
+		"timestamp":        time.Now().Unix(),
+		"clients":          make([]map[string]interface{}, 0, len(h.clients)),
+	}
+
+	for clientID, client := range h.clients {
+		clientStats := map[string]interface{}{
+			"id":         clientID,
+			"remote_addr": client.RemoteAddr,
+			"user_agent":  client.UserAgent,
+			"last_ping":   client.LastPing.Unix(),
+			"connected_for": time.Since(client.LastPing).Seconds(),
+		}
+		stats["clients"] = append(stats["clients"].([]map[string]interface{}), clientStats)
+	}
+
+	return stats
+}
+
+// Cleanup properly shuts down the WebSocket handler
 func (h *WebsocketHandler) Cleanup() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
+	// Signal shutdown to health checker
+	close(h.shutdownChan)
 
 	// Cancel any active QR timeout
 	if h.qrTimeout != nil {
 		h.qrTimeout.Stop()
 		h.qrTimeout = nil
 	}
+
+	// Close all client connections
+	for clientID, client := range h.clients {
+		client.Conn.Close()
+		log.Printf("Closed connection for client %s during cleanup", clientID)
+	}
+
+	// Clear client maps
+	h.clients = make(map[string]*ClientInfo)
+	h.clientsByConn = make(map[*websocket.Conn]string)
+
+	log.Printf("WebSocket handler cleanup completed")
 }
 
 func (h *WebsocketHandler) GetWhatsAppClient() *whatsmeow.Client {

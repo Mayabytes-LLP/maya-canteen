@@ -1,6 +1,10 @@
 import { type FC, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { toast } from "sonner";
+import {
+	ReconnectingWebSocket,
+	type WebSocketMessage,
+} from "@/lib/websocket-manager";
 import { transactionService } from "@/services/transaction-service";
 import { AppContext, initialState } from "./app-context";
 
@@ -31,127 +35,158 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 	const location = useLocation();
 	const navigate = useNavigate();
 
-	const ws = useRef<WebSocket | null>(null);
+	const ws = useRef<ReconnectingWebSocket | null>(null);
 
 	useEffect(() => {
 		const connectWebSocket = () => {
 			// Prevent duplicate connections
-			if (
-				ws.current &&
-				ws.current.readyState !== WebSocket.CLOSED &&
-				ws.current.readyState !== WebSocket.CLOSING
-			) {
+			if (ws.current) {
 				console.warn(
-					"WebSocket is already connected or connecting. Skipping new connection.",
+					"WebSocket is already initialized. Skipping new connection.",
 				);
 				return;
 			}
-			ws.current = new WebSocket(VITE_WS_URL);
 
-			ws.current.onopen = () => {
-				console.log("WebSocket connected");
-			};
+			ws.current = new ReconnectingWebSocket({
+				url: VITE_WS_URL,
+				maxAttempts: 10,
+				baseDelay: 1000,
+				maxDelay: 30000,
+				jitterRange: 2000,
+				pingInterval: 30000,
+				pongTimeout: 60000,
+				onOpen: () => {
+					console.log("WebSocket connected successfully");
+					toast.success("Connected to server", { duration: 2000 });
+				},
+				onClose: () => {
+					console.log("WebSocket disconnected");
+					toast.warning("Disconnected from server", { duration: 3000 });
+				},
+				onError: (error) => {
+					console.error("WebSocket error:", error);
+					toast.error("Connection error occurred", { duration: 3000 });
+				},
+				onReconnectAttempt: (attempt, delay) => {
+					console.log(`Reconnection attempt ${attempt} in ${delay}ms`);
+					if (attempt === 1) {
+						toast.info("Attempting to reconnect...", { duration: 2000 });
+					} else if (attempt % 3 === 0) {
+						toast.warning(`Reconnection attempt ${attempt}...`, {
+							duration: 2000,
+						});
+					}
+				},
+				onMessage: async (message: WebSocketMessage) => {
+					try {
+						console.log("WebSocket message:", message);
 
-			ws.current.onmessage = async (event) => {
-				try {
-					const message = JSON.parse(event.data);
-					console.log("WebSocket message:", message);
-
-					switch (message.type) {
-						case "ping":
-							ws.current?.send(JSON.stringify({ type: "pong" }));
-							break;
-						case "device_status": {
-							const { status } = message.payload;
-							if (status !== "connected") {
-								setZkDeviceStatus(false);
+						switch (message.type) {
+							case "device_status": {
+								const { status } = message.payload as { status: string };
+								if (status !== "connected") {
+									setZkDeviceStatus(false);
+									break;
+								}
+								setZkDeviceStatus(true);
 								break;
 							}
-							setZkDeviceStatus(true);
-							break;
-						}
-						case "attendance_event": {
-							console.log("Attendance event:", message);
-							const { user_id } = message.payload;
-							const user = await transactionService.getUser(user_id);
-							if (!user) {
-								toast.error("User not found");
-								return;
+							case "attendance_event": {
+								console.log("Attendance event:", message);
+								const { user_id } = message.payload as { user_id: string };
+								const user = await transactionService.getUser(user_id);
+								if (!user) {
+									toast.error("User not found");
+									return;
+								}
+								setCurrentUser(user);
+								toast.success("User logged in successfully");
+								break;
 							}
-							setCurrentUser(user);
-							toast.success("User logged in successfully");
-							break;
-						}
-						case "whatsapp_qr": {
-							console.log("WhatsApp QR code received:", message);
-							const { qr_code_base64, logged_in } = message.payload;
+							case "whatsapp_qr": {
+								console.log("WhatsApp QR code received:", message);
+								const { qr_code_base64, logged_in } = message.payload as {
+									qr_code_base64: string;
+									logged_in: boolean;
+								};
 
-							if (logged_in) {
-								// Already logged in, no need for QR code
-								setWhatsappQR(null);
-								toast.success("WhatsApp is already logged in");
-							} else if (!qr_code_base64 || qr_code_base64 === "") {
-								// No QR code or empty QR code
-								setWhatsappQR(null);
-							} else {
-								// Valid QR code received, set it for display
-								setWhatsappQR(qr_code_base64);
-								toast.info("WhatsApp QR code refreshed. Please scan to login.");
+								if (logged_in) {
+									// Already logged in, no need for QR code
+									setWhatsappQR(null);
+									toast.success("WhatsApp is already logged in");
+								} else if (!qr_code_base64 || qr_code_base64 === "") {
+									// No QR code or empty QR code
+									setWhatsappQR(null);
+								} else {
+									// Valid QR code received, set it for display
+									setWhatsappQR(qr_code_base64);
+									toast.info(
+										"WhatsApp QR code refreshed. Please scan to login.",
+									);
+								}
+								break;
 							}
-							break;
-						}
-						case "whatsapp_status": {
-							console.log("WhatsApp status:", message);
-							const {
-								status,
-								message: statusMessage,
-								client_info,
-							} = message.payload;
-							setWhatsappStatus({
-								connected: status === "connected",
-								message:
-									statusMessage ||
-									(status === "connected" ? "Connected" : "Disconnected"),
-							});
-							setWhatsappClientInfo(client_info || null);
+							case "whatsapp_status": {
+								console.log("WhatsApp status:", message);
+								const {
+									status,
+									message: statusMessage,
+									client_info,
+								} = message.payload as {
+									status: string;
+									message: string;
+									client_info: Record<string, unknown>;
+								};
+								setWhatsappStatus({
+									connected: status === "connected",
+									message:
+										statusMessage ||
+										(status === "connected" ? "Connected" : "Disconnected"),
+								});
+								setWhatsappClientInfo(client_info || null);
 
-							if (status === "connected") {
-								toast.success(statusMessage || "WhatsApp connected");
-							} else {
-								toast.error(statusMessage || "WhatsApp disconnected");
+								if (status === "connected") {
+									toast.success(statusMessage || "WhatsApp connected");
+								} else {
+									toast.error(statusMessage || "WhatsApp disconnected");
+								}
+								break;
 							}
-							break;
+							case "connection_status": {
+								// Handle connection status updates from server
+								const { total_connections } = message.payload as {
+									total_connections: number;
+								};
+								console.log(
+									`Server reports ${total_connections} active connections`,
+								);
+								break;
+							}
+							case "connected": {
+								// Initial connection message from server
+								const { message: msg, client_id } = message.payload as {
+									message: string;
+									client_id: string;
+								};
+								console.log(
+									`Connected to server: ${msg}, client ID: ${client_id}`,
+								);
+								break;
+							}
 						}
+					} catch (error) {
+						console.error("WebSocket message error:", error);
 					}
-				} catch (error) {
-					console.error("WebSocket message error:", error);
-				}
-			};
-
-			ws.current.onclose = () => {
-				console.log("WebSocket disconnected");
-				// Attempt to reconnect after 5 seconds
-				setTimeout(() => {
-					if (!ws.current || ws.current.readyState === WebSocket.CLOSED) {
-						console.log("Attempting to reconnect...");
-						connectWebSocket();
-					}
-				}, 5000);
-			};
-
-			ws.current.onerror = (error) => {
-				console.error("WebSocket error:", error);
-				if (ws.current) {
-					ws.current.close();
-				}
-			};
+				},
+			});
 		};
 
 		connectWebSocket();
 
 		return () => {
 			if (ws.current) {
-				ws.current.close();
+				ws.current.disconnect(true);
+				ws.current = null;
 			}
 		};
 	}, []);

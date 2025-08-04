@@ -41,7 +41,7 @@ export default function TransactionsPage() {
 	// Apply the new limit
 	const applyLimit = () => {
 		const limit = parseInt(inputLimit);
-		if (!isNaN(limit) && limit > 0) {
+		if (!Number.isNaN(limit) && limit > 0) {
 			setTransactionLimit(limit);
 		} else {
 			setInputLimit(transactionLimit.toString());
@@ -54,11 +54,17 @@ export default function TransactionsPage() {
 			toast.info("WhatsApp is already connected. No need to refresh.");
 			return;
 		}
-		if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+		if (ws.current?.isConnected()) {
 			setIsRefreshing(true);
 			// Send refresh command to backend
-			ws.current.send(JSON.stringify({ type: "refresh_whatsapp" }));
-			toast.info("Connecting to WhatsApp...");
+			const success = ws.current.send({ type: "refresh_whatsapp" });
+			if (success) {
+				toast.info("Connecting to WhatsApp...");
+			} else {
+				toast.error("Failed to send refresh command");
+				setIsRefreshing(false);
+				return;
+			}
 
 			// Set a timeout to reset the refreshing state after a reasonable time
 			setTimeout(() => {
@@ -78,7 +84,77 @@ export default function TransactionsPage() {
 				<div>
 					<DepositForm onTransactionAdded={handleTransactionAdded} />
 				</div>
-				<div>
+				<div className="space-y-4">
+					<Card>
+						<CardHeader>
+							<div className="flex justify-between items-center">
+								<div>
+									<CardTitle>WebSocket Connection</CardTitle>
+									<CardDescription>Real-time connection status</CardDescription>
+								</div>
+								<Badge
+									variant={
+										ws.current?.isConnected() ? "default" : "destructive"
+									}
+									className={`${
+										ws.current?.isConnected() ? "bg-green-600" : "bg-red-600"
+									} text-white`}
+								>
+									{ws.current?.isConnected() ? "Connected" : "Disconnected"}
+								</Badge>
+							</div>
+						</CardHeader>
+						<CardContent>
+							{ws.current && (
+								<div className="space-y-2 text-sm">
+									<div className="flex justify-between">
+										<span>Ready State:</span>
+										<span className="font-mono">
+											{ws.current.getReadyState() ?? "Unknown"}
+										</span>
+									</div>
+									<div className="flex justify-between">
+										<span>Reconnect Attempts:</span>
+										<span className="font-mono">
+											{ws.current.getConnectionStats().reconnectAttempts}
+										</span>
+									</div>
+									<div className="flex justify-between">
+										<span>Last Activity:</span>
+										<span className="font-mono">
+											{new Date(
+												ws.current.getConnectionStats().lastPongReceived,
+											).toLocaleTimeString()}
+										</span>
+									</div>
+								</div>
+							)}
+						</CardContent>
+						<CardFooter className="flex gap-2">
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => ws.current?.reconnect()}
+								disabled={ws.current?.isConnected()}
+							>
+								<RefreshCw className="h-4 w-4 mr-2" />
+								Reconnect
+							</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => {
+									if (ws.current) {
+										const stats = ws.current.getConnectionStats();
+										console.log("WebSocket stats:", stats);
+										toast.info("Check console for connection details");
+									}
+								}}
+							>
+								Debug
+							</Button>
+						</CardFooter>
+					</Card>
 					<Card>
 						<CardHeader>
 							<div className="flex justify-between items-center">

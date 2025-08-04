@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { ReconnectingWebSocket } from "@/lib/websocket-manager";
 import type { User } from "@/services/transaction-service";
 
 export interface AppState {
@@ -12,7 +13,7 @@ export interface AppState {
 	whatsappClientInfo?: Record<string, unknown> | null;
 	setCurrentUser: (user: User | null) => void;
 	setAdmin: (admin: boolean) => void;
-	ws: React.RefObject<WebSocket | null>;
+	ws: React.RefObject<ReconnectingWebSocket | null>;
 	whatsappQR: string | null;
 }
 

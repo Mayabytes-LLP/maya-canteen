@@ -495,6 +495,12 @@ export const transactionService = {
 		year?: number,
 		includeTransactions = false,
 	): Promise<{ success: boolean; message?: string }> {
+		console.log(
+			"Sending WhatsApp notification for employee:",
+			employeeId,
+			"including transactions:",
+			includeTransactions,
+		);
 		const response = await fetch(`${API_BASE}/whatsapp/notify/${employeeId}`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
@@ -502,7 +508,7 @@ export const transactionService = {
 				message_template: messageTemplate,
 				month: month,
 				year: year,
-				includeTransactions,
+				include_transactions: includeTransactions,
 			}),
 		});
 
@@ -541,7 +547,7 @@ export const transactionService = {
 							message_template: messageTemplate,
 							month: month,
 							year: year,
-							includeTransactions,
+							include_transactions: includeTransactions,
 						}
 					: {},
 			),

@@ -23,7 +23,10 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { DEFAULT_WHATSAPP_MESSAGE_TEMPLATE } from "@/constants/whatsapp-message-template";
+import {
+	DEFAULT_WHATSAPP_MESSAGE_TEMPLATE,
+	months,
+} from "@/constants/whatsapp-message-template";
 import { AppContext } from "@/context";
 import { transactionService } from "@/services/transaction-service";
 
@@ -43,20 +46,6 @@ export default function SendAllBalance() {
 
 	const [selectedDuration, setSelectedDuration] =
 		useState<string>("Half month");
-	const months = [
-		"January",
-		"February",
-		"March",
-		"April",
-		"May",
-		"June",
-		"July",
-		"August",
-		"September",
-		"October",
-		"November",
-		"December",
-	];
 	const years = Array.from(
 		{ length: 5 },
 		(_, i) => new Date().getFullYear() - 2 + i,

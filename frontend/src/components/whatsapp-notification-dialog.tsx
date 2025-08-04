@@ -19,7 +19,10 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { DEFAULT_WHATSAPP_MESSAGE_TEMPLATE } from "@/constants/whatsapp-message-template";
+import {
+	DEFAULT_WHATSAPP_MESSAGE_TEMPLATE,
+	months,
+} from "@/constants/whatsapp-message-template";
 
 interface WhatsAppNotificationDialogProps {
 	open: boolean;
@@ -53,20 +56,6 @@ export function WhatsAppNotificationDialog({
 		useState<string>("Half month");
 	const [includeTransactions, setIncludeTransactions] = useState<boolean>(true);
 
-	const months = [
-		"January",
-		"February",
-		"March",
-		"April",
-		"May",
-		"June",
-		"July",
-		"August",
-		"September",
-		"October",
-		"November",
-		"December",
-	];
 	const years = Array.from(
 		{ length: 5 },
 		(_, i) => new Date().getFullYear() - 2 + i,
