@@ -9,6 +9,7 @@ import (
 	"maya-canteen/internal/models"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -351,6 +352,36 @@ func sendBalanceNotifications(
 
 // notifyUserBalances is a modular handler for sending WhatsApp notifications to one or all users.
 // If employeeID is 0, it sends to all users; otherwise, to the specified user.
+// simple in-memory idempotency cache
+var whatsappRequestCache = struct {
+	mu sync.Mutex
+	m  map[string]time.Time
+}{
+	m: make(map[string]time.Time),
+}
+
+func cleanupWhatsappRequestCache() {
+	whatsappRequestCache.mu.Lock()
+	defer whatsappRequestCache.mu.Unlock()
+	now := time.Now()
+	for k, t := range whatsappRequestCache.m {
+		if now.Sub(t) > 2*time.Minute {
+			delete(whatsappRequestCache.m, k)
+		}
+	}
+}
+
+func init() {
+	// start background cleanup ticker
+	go func() {
+		ticker := time.NewTicker(1 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			cleanupWhatsappRequestCache()
+		}
+	}()
+}
+
 func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Request, employeeID int64) {
 	client := h.GetWhatsAppClient()
 	if client == nil || !client.IsLoggedIn() || !client.IsConnected() {
@@ -358,6 +389,27 @@ func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Requ
 		common.RespondWithError(w, http.StatusInternalServerError, "WhatsApp client is not available")
 		return
 	}
+
+	// Idempotency: check X-Request-ID header to prevent duplicate sends
+	requestID := r.Header.Get("X-Request-ID")
+	if requestID == "" {
+		requestID = fmt.Sprintf("rid-%d", time.Now().UnixNano())
+	}
+	whatsappRequestCache.mu.Lock()
+	if _, ok := whatsappRequestCache.m[requestID]; ok {
+		// recent duplicate
+		whatsappRequestCache.mu.Unlock()
+		log.WithFields(log.Fields{"request_id": requestID}).Warn("Duplicate WhatsApp notification request detected; ignoring")
+		resp := map[string]any{
+			"success": true,
+			"message": "Duplicate request ignored",
+		}
+		common.RespondWithJSON(w, http.StatusAccepted, resp)
+		return
+	}
+	// mark request id
+	whatsappRequestCache.m[requestID] = time.Now()
+	whatsappRequestCache.mu.Unlock()
 
 	// Parse request body and date range
 	messageTemplate, startDate, endDate, includeTransactions, err := parseBalanceNotificationRequest(r)
