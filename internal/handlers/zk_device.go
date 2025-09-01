@@ -48,16 +48,16 @@ func SetupZKDevice(eventLogger *logStd.Logger, broadcastFunc func(event string, 
 				continue
 			}
 			log.Info("ZK Device Connected")
-				broadcastFunc("device_status", map[string]any{
-					"status": "connected",
-				})
+			broadcastFunc("device_status", map[string]any{
+				"status": "connected",
+			})
 
 			go func() {
 				for {
 					time.Sleep(3 * time.Second)
-						broadcastFunc("device_status", map[string]any{
-							"status": "connected",
-						})
+					broadcastFunc("device_status", map[string]any{
+						"status": "connected",
+					})
 				}
 			}()
 			for event := range c {
@@ -65,17 +65,17 @@ func SetupZKDevice(eventLogger *logStd.Logger, broadcastFunc func(event string, 
 				if event.UserID != "" {
 					log.Infof("[WebSocket] Broadcasting attendance event - UserID: %v, Time: %v", event.UserID, event.AttendedAt)
 					eventLogger.Printf("Event: %v", event)
-						broadcastFunc("attendance_event", map[string]any{
-							"user_id":   event.UserID,
-							"timestamp": event.AttendedAt.Format(time.RFC3339),
-						})
+					broadcastFunc("attendance_event", map[string]any{
+						"user_id":   event.UserID,
+						"timestamp": event.AttendedAt.Format(time.RFC3339),
+					})
 				}
 			}
 
 			log.Info("ZK Device disconnected. Retrying in 3 seconds...")
-				broadcastFunc("device_status", map[string]any{
-					"status": "disconnected",
-				})
+			broadcastFunc("device_status", map[string]any{
+				"status": "disconnected",
+			})
 			time.Sleep(3 * time.Second)
 		}
 	}()

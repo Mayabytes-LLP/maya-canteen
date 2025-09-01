@@ -12,8 +12,8 @@ build:
 # Run the application
 run:
 	@go run cmd/api/main.go &
-	@npm install --prefer-offline --no-fund --prefix ./frontend
-	@npm run dev --prefix ./frontend
+	@pnpm install --prefer-offline --no-fund --prefix ./frontend
+	@pnpm run dev --prefix ./frontend
 # Create DB container
 docker-run:
 	@if docker compose up --build 2>/dev/null; then \

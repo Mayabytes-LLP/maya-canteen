@@ -66,6 +66,7 @@ export function WhatsAppNotificationDialog({
 			.replace(/\{month\}/g, selectedMonth)
 			.replace(/\{year\}/g, selectedYear.toString())
 			.replace(/\{duration\}/g, selectedDuration);
+		// Call onSend synchronously and let parent set sending state immediately
 		onSend(finalMessage, selectedMonth, selectedYear, includeTransactions);
 	};
 

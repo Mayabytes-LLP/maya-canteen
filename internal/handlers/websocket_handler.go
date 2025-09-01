@@ -37,16 +37,16 @@ type ClientInfo struct {
 type WebsocketHandler struct {
 	common.BaseHandler
 	upgrader             websocket.Upgrader
-	clients              map[string]*ClientInfo // Changed to map with client ID
+	clients              map[string]*ClientInfo     // Changed to map with client ID
 	clientsByConn        map[*websocket.Conn]string // Reverse lookup
-	mu                   sync.RWMutex     // Use RWMutex for better performance
-	latestWhatsappQR     string          // Store the latest WhatsApp QR code
-	whatsappClient       WhatsAppClient  // Store reference to WhatsApp client
-	getQRChannel         QRChannelGetter // Function to get a QR channel
-	connectionInProgress bool            // Flag to prevent multiple connection attempts
-	qrTimeout            *time.Timer     // Timer to cancel QR refresh after timeout
-	healthTicker         *time.Ticker    // Health check ticker
-	shutdownChan         chan struct{}   // Shutdown signal
+	mu                   sync.RWMutex               // Use RWMutex for better performance
+	latestWhatsappQR     string                     // Store the latest WhatsApp QR code
+	whatsappClient       WhatsAppClient             // Store reference to WhatsApp client
+	getQRChannel         QRChannelGetter            // Function to get a QR channel
+	connectionInProgress bool                       // Flag to prevent multiple connection attempts
+	qrTimeout            *time.Timer                // Timer to cancel QR refresh after timeout
+	healthTicker         *time.Ticker               // Health check ticker
+	shutdownChan         chan struct{}              // Shutdown signal
 }
 
 type WSMessage struct {
@@ -224,7 +224,7 @@ func (h *WebsocketHandler) Socket(w http.ResponseWriter, r *http.Request) {
 
 	// Send initial connection message
 	msg := WSMessage{
-		Type:    "connected",
+		Type: "connected",
 		Payload: map[string]interface{}{
 			"message":   "WebSocket connection established",
 			"client_id": clientID,
@@ -554,7 +554,7 @@ func (h *WebsocketHandler) BroadcastConnectionStatus() {
 
 	h.Broadcast("connection_status", map[string]interface{}{
 		"total_connections": connectionCount,
-		"timestamp":        time.Now().Unix(),
+		"timestamp":         time.Now().Unix(),
 	})
 }
 
@@ -565,16 +565,16 @@ func (h *WebsocketHandler) GetConnectionStats() map[string]interface{} {
 
 	stats := map[string]interface{}{
 		"total_connections": len(h.clients),
-		"timestamp":        time.Now().Unix(),
-		"clients":          make([]map[string]interface{}, 0, len(h.clients)),
+		"timestamp":         time.Now().Unix(),
+		"clients":           make([]map[string]interface{}, 0, len(h.clients)),
 	}
 
 	for clientID, client := range h.clients {
 		clientStats := map[string]interface{}{
-			"id":         clientID,
-			"remote_addr": client.RemoteAddr,
-			"user_agent":  client.UserAgent,
-			"last_ping":   client.LastPing.Unix(),
+			"id":            clientID,
+			"remote_addr":   client.RemoteAddr,
+			"user_agent":    client.UserAgent,
+			"last_ping":     client.LastPing.Unix(),
 			"connected_for": time.Since(client.LastPing).Seconds(),
 		}
 		stats["clients"] = append(stats["clients"].([]map[string]interface{}), clientStats)

@@ -501,9 +501,10 @@ export const transactionService = {
 			"including transactions:",
 			includeTransactions,
 		);
+		const requestId = (globalThis.crypto && (globalThis.crypto as any).randomUUID) ? (globalThis.crypto as any).randomUUID() : `rid-${Date.now()}-${Math.floor(Math.random()*100000)}`
 		const response = await fetch(`${API_BASE}/whatsapp/notify/${employeeId}`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: { "Content-Type": "application/json", "X-Request-ID": requestId },
 			body: JSON.stringify({
 				message_template: messageTemplate,
 				month: month,

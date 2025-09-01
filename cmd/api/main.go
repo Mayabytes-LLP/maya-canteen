@@ -11,7 +11,6 @@ import (
 	"go.mau.fi/whatsmeow"
 )
 
-
 func main() {
 	logFile, err := server.SetupLogFile("zk_events.log")
 	if err != nil {

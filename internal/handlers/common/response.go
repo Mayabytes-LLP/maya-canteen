@@ -8,9 +8,9 @@ import (
 
 // Response represents the standard API response structure
 type Response struct {
-	Status  string      `json:"status"`
-	Message string      `json:"message,omitempty"`
-	Data    any `json:"data,omitempty"`
+	Status  string `json:"status"`
+	Message string `json:"message,omitempty"`
+	Data    any    `json:"data,omitempty"`
 }
 
 // RespondWithJSON writes a JSON response with the given status code and payload
