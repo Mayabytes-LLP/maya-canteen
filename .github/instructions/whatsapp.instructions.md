@@ -38,7 +38,7 @@ _For AI coding agents working with WhatsApp/whatsmeow in this codebase._
 
 - Always check `client.IsLoggedIn()` and `client.IsConnected()` before sending.
 - Use `GetQRChannel(ctx)` before `Connect()` for QR login flows.
-- Use `IsOnWhatsApp([]string{phone})` to validate recipients.
+- Use `IsOnWhatsApp(ctx, []string{phone})` to validate recipients (requires context as first parameter in latest whatsmeow).
 - For media/CSV, upload with `client.Upload(ctx, data, whatsmeow.MediaDocument)` and send as a document message.
 - See [whatsmeow GoDoc](https://pkg.go.dev/go.mau.fi/whatsmeow) for all available methods and error types.
 

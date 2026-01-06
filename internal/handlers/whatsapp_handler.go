@@ -56,7 +56,7 @@ func (h *WhatsAppHandler) getWhatsAppRecipient(phoneNumber string) (types.JID, e
 		return types.JID{}, fmt.Errorf("WhatsApp client is not connected")
 	}
 
-	results, err := client.IsOnWhatsApp([]string{phoneNumber})
+	results, err := client.IsOnWhatsApp(context.Background(), []string{phoneNumber})
 	if err != nil {
 		return types.JID{}, fmt.Errorf("failed to check WhatsApp status for %s: %v", phoneNumber, err)
 	}
