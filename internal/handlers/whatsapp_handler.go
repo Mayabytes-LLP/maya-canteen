@@ -4,13 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"maya-canteen/internal/database"
-	"maya-canteen/internal/handlers/common"
-	"maya-canteen/internal/models"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	"maya-canteen/internal/database"
+	"maya-canteen/internal/handlers/common"
+	"maya-canteen/internal/models"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
@@ -30,6 +31,9 @@ const (
 )
 
 type Client = whatsmeow.Client
+
+// Global mutex to prevent concurrent bulk notification operations
+var bulkOperationMutex sync.Mutex
 
 // WhatsAppHandler manages the WhatsApp integration with our application
 type WhatsAppHandler struct {
@@ -504,6 +508,11 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 
 // NotifyAllUsersBalances handles sending WhatsApp notifications to all users
 func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.Request) {
+	// Acquire global lock to prevent concurrent bulk operations
+	bulkOperationMutex.Lock()
+	defer bulkOperationMutex.Unlock()
+
+	log.Info("Starting bulk WhatsApp notification operation (with global lock)")
 	h.notifyUserBalances(w, r, 0)
 }
 

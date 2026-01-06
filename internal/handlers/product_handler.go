@@ -1,11 +1,12 @@
 package handlers
 
 import (
+	"net/http"
+
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/errors"
 	"maya-canteen/internal/handlers/common"
 	"maya-canteen/internal/models"
-	"net/http"
 
 	"github.com/gorilla/mux"
 )

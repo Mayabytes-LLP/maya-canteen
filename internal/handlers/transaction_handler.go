@@ -1,13 +1,14 @@
 package handlers
 
 import (
+	"net/http"
+	"strconv"
+	"time"
+
 	"maya-canteen/internal/database"
 	"maya-canteen/internal/errors"
 	"maya-canteen/internal/handlers/common"
 	"maya-canteen/internal/models"
-	"net/http"
-	"strconv"
-	"time"
 
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"

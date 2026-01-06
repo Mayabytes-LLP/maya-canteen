@@ -529,19 +529,22 @@ export const transactionService = {
 	): Promise<{
 		success: boolean;
 		data?: {
-			details: {
-				fail_count: number;
-				failed_users: string[];
-				success_count: number;
-			};
+			results: Array<{
+				employee_id: string;
+				success: boolean;
+				error?: string;
+			}>;
 			message: string;
 			success: boolean;
 		};
 		message?: string;
 	}> {
+		// Generate request ID to prevent duplicate bulk operations
+		const requestId = (globalThis.crypto && (globalThis.crypto as any).randomUUID) ? (globalThis.crypto as any).randomUUID() : `rid-${Date.now()}-${Math.floor(Math.random()*100000)}`;
+		
 		const response = await fetch(`${API_BASE}/whatsapp/notify-all`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: { "Content-Type": "application/json", "X-Request-ID": requestId },
 			body: JSON.stringify(
 				messageTemplate
 					? {
