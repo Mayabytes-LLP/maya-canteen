@@ -43,6 +43,10 @@ export default function SendAllBalance() {
 	});
 	const [sendingAllNotifications, setSendingAllNotifications] = useState(false);
 	const [includeTransactions, setIncludeTransactions] = useState<boolean>(true);
+	
+	// Debouncing: Track last click time to prevent rapid multiple clicks
+	const [lastBulkClickTime, setLastBulkClickTime] = useState<number>(0);
+	const DEBOUNCE_DELAY_MS = 5000; // 5 seconds debounce
 
 	const [selectedDuration, setSelectedDuration] =
 		useState<string>("Half month");
@@ -71,15 +75,18 @@ export default function SendAllBalance() {
 			);
 			if (response.success && response.data) {
 				// Show success message with details
+				const failedUsers = response.data.results.filter(r => !r.success);
 				toast.success(
 					<div className="space-y-2">
 						<p>{response.data.message}</p>
-						{response.data.details.failed_users.length > 0 && (
+						{failedUsers.length > 0 && (
 							<div className="text-sm">
 								<p className="font-semibold">Failed Users:</p>
 								<ul className="list-disc pl-4">
-									{response.data.details.failed_users.map((user: string) => (
-										<li key={user}>{user}</li>
+									{failedUsers.map((result) => (
+										<li key={result.employee_id}>
+											{result.employee_id}: {result.error || "Unknown error"}
+										</li>
 									))}
 								</ul>
 							</div>
@@ -206,6 +213,16 @@ export default function SendAllBalance() {
 				<DialogFooter>
 					<Button
 						onClick={() => {
+							const now = Date.now();
+							
+							// Check debounce delay
+							if (now - lastBulkClickTime < DEBOUNCE_DELAY_MS) {
+								toast.warning(`Please wait ${Math.ceil((DEBOUNCE_DELAY_MS - (now - lastBulkClickTime)) / 1000)} more seconds before sending again.`);
+								return;
+							}
+							
+							setLastBulkClickTime(now);
+							
 							const finalMessage = allMessageTemplate
 								.replace(/\{month\}/g, selectedMonth)
 								.replace(/\{year\}/g, selectedYear.toString())
@@ -218,7 +235,11 @@ export default function SendAllBalance() {
 							);
 							setAllMessageDialogOpen(false);
 						}}
-						disabled={sendingAllNotifications}
+						disabled={
+							sendingAllNotifications || 
+							!whatsappStatus.connected || 
+							(Date.now() - lastBulkClickTime < DEBOUNCE_DELAY_MS)
+						}
 					>
 						Send Notifications
 					</Button>

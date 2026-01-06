@@ -5,11 +5,12 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"maya-canteen/internal/database"
-	"maya-canteen/internal/handlers/common"
 	"net/http"
 	"sync"
 	"time"
+
+	"maya-canteen/internal/database"
+	"maya-canteen/internal/handlers/common"
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"

@@ -23,7 +23,6 @@ tmp/
 .idea
 
 # .env file
-.env
 
 # Project build
 main
@@ -38,3 +37,5 @@ db/
 *.db
 
 *.log
+config.bat
+node_modules
