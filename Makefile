@@ -1,13 +1,24 @@
 # Simple Makefile for a Go project
 
+VERSION    ?= 1.0.0
+GIT_COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "unknown")
+LDFLAGS    := -X maya-canteen/internal/version.Version=$(VERSION) \
+              -X maya-canteen/internal/version.GitCommit=$(GIT_COMMIT) \
+              -X maya-canteen/internal/version.BuildTime=$(BUILD_TIME)
+
 # Build the application
 all: build test
 
 build:
 	@echo "Building..."
-	
-	
-	@CGO_ENABLED=1 GOOS=linux go build -o main cmd/api/main.go
+	@CGO_ENABLED=1 GOOS=linux go build -ldflags "$(LDFLAGS)" -o main cmd/api/main.go
+
+build-windows:
+	@echo "Generating Windows resources..."
+	@cd cmd/api && go-winres make --product-version $(VERSION).0 --file-version $(VERSION).0
+	@echo "Building Windows executable..."
+	@CGO_ENABLED=1 GOOS=windows go build -ldflags "$(LDFLAGS)" -o maya-canteen.exe cmd/api/main.go
 
 # Run the application
 run:
@@ -40,7 +51,8 @@ test:
 # Clean the binary
 clean:
 	@echo "Cleaning..."
-	@rm -f main
+	@rm -f main maya-canteen.exe
+	@find cmd/api -name '*.syso' -delete
 
 # Live Reload
 watch:
@@ -59,4 +71,4 @@ watch:
             fi; \
         fi
 
-.PHONY: all build run test clean watch
+.PHONY: all build build-windows run test clean watch

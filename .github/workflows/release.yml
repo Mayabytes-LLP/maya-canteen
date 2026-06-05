@@ -53,28 +53,32 @@ jobs:
           cd frontend
           pnpm build
 
+      - name: Set version from tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "Building version: $VERSION"
+
+      - name: Generate Windows resources
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          go install github.com/tc-hib/go-winres@latest
+          choco install imagemagick -y
+          magick frontend/public/mayabytes-favicon-270x270.png -resize 256x256 cmd/api/winres/icon.png
+          cd cmd/api
+          go-winres make --product-version "$env:VERSION.0" --file-version "$env:VERSION.0"
+
       - name: Build Backend for Windows
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          # Install rcedit tool to modify Windows executables
-          choco install rcedit -y
-
-          # Install ImageMagick to convert PNG to ICO
-          choco install imagemagick -y
-
-          # Convert PNG to ICO format
-          $iconPath = "app_icon.ico"
-          magick "frontend/public/mayabytes-favicon-270x270.png" -define icon:auto-resize=64,48,32,16 $iconPath
-
-          # Build the application without icon first
-          $env:CGO_ENABLED=1
-          $env:GOOS="windows"
-          $env:GOARCH="amd64"
-          go build -o ${{ matrix.output_name }} cmd/api/main.go
-
-          # Use rcedit to add icon
-          rcedit "${{ matrix.output_name }}" --set-icon $iconPath
+          $env:CGO_ENABLED = "1"
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          $buildTime = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          go build -ldflags "-X maya-canteen/internal/version.Version=$env:VERSION -X maya-canteen/internal/version.GitCommit=${{ github.sha }} -X maya-canteen/internal/version.BuildTime=$buildTime" -o ${{ matrix.output_name }} cmd/api/main.go
 
       - name: Build Backend for Linux/macOS
         if: matrix.os != 'windows-latest'
@@ -85,7 +89,7 @@ jobs:
           else
             export GOOS=darwin
           fi
-          CGO_ENABLED=1 GOARCH=amd64 go build -o ${{ matrix.output_name }} cmd/api/main.go
+          CGO_ENABLED=1 GOARCH=amd64 go build -ldflags "-X maya-canteen/internal/version.Version=$VERSION -X maya-canteen/internal/version.GitCommit=${{ github.sha }} -X 'maya-canteen/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" -o ${{ matrix.output_name }} cmd/api/main.go
 
       - name: Upload release asset
         uses: actions/upload-release-asset@v1

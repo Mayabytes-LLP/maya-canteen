@@ -40,3 +40,7 @@ db/
 *.log
 config.bat
 node_modules
+
+# Windows resource files (regenerated from winres/winres.json)
+*.syso
+cmd/api/winres/icon.png
