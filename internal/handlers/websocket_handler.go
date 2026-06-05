@@ -23,6 +23,7 @@ type WhatsAppClient interface {
 	Connect() error
 	IsConnected() bool
 	IsLoggedIn() bool
+	Disconnect()
 }
 
 // QRChannelGetter is a function type that gets a QR channel from the WhatsApp client
@@ -46,9 +47,9 @@ type WebsocketHandler struct {
 	latestWhatsappQR     string                     // Store the latest WhatsApp QR code
 	whatsappClient       WhatsAppClient             // Store reference to WhatsApp client
 	getQRChannel         QRChannelGetter            // Function to get a QR channel
-	connectionGeneration  uint64                     // Monotonically increasing ID for each connection attempt
-	connectionInProgress  bool                       // Flag to prevent multiple connection attempts
-	qrTimeout             *time.Timer                // Timer to cancel QR refresh after timeout
+	connectionGeneration uint64                     // Monotonically increasing ID for each connection attempt
+	connectionInProgress bool                       // Flag to prevent multiple connection attempts
+	qrTimeout            *time.Timer                // Timer to cancel QR refresh after timeout
 	healthTicker         *time.Ticker               // Health check ticker
 	shutdownChan         chan struct{}              // Shutdown signal
 }
@@ -460,15 +461,48 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 				}
 				h.mu.Unlock()
 
-				log.Println("WhatsApp login successful")
-				h.Broadcast("whatsapp_status", map[string]any{
-					"status":  "connected",
-					"message": "WhatsApp login successful",
-				})
-				h.Broadcast("whatsapp_qr", map[string]any{
-					"qr_code_base64": "",
-					"logged_in":      true,
-				})
+				log.Println("WhatsApp login successful via QR channel")
+
+				if h.whatsappClient.IsConnected() {
+					h.Broadcast("whatsapp_status", map[string]any{
+						"status":  "connected",
+						"message": "WhatsApp login successful",
+					})
+					h.Broadcast("whatsapp_qr", map[string]any{
+						"qr_code_base64": "",
+						"logged_in":      true,
+					})
+				} else {
+					log.Println("QR scan successful but client not yet connected, reconnecting with credentials")
+					h.Broadcast("whatsapp_status", map[string]any{
+						"status":  "connecting",
+						"message": "QR scan successful. Establishing connection...",
+					})
+					go func() {
+						time.Sleep(2 * time.Second)
+						if !h.whatsappClient.IsConnected() {
+							client := h.GetWhatsAppClient()
+							if client != nil && client.Store.ID != nil {
+								if err := h.whatsappClient.Connect(); err != nil {
+									log.Printf("Failed to reconnect after QR scan success: %v", err)
+									h.Broadcast("whatsapp_status", map[string]any{
+										"status":  "disconnected",
+										"message": "Connection failed after QR scan. Please try again.",
+									})
+									return
+								}
+							}
+						}
+						h.Broadcast("whatsapp_status", map[string]any{
+							"status":  "connected",
+							"message": "WhatsApp connected successfully",
+						})
+						h.Broadcast("whatsapp_qr", map[string]any{
+							"qr_code_base64": "",
+							"logged_in":      true,
+						})
+					}()
+				}
 				break
 			case evt == whatsmeow.QRChannelTimeout:
 				h.mu.Lock()
@@ -514,15 +548,62 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 				}
 				h.mu.Unlock()
 
-				log.Println("WhatsApp unexpected state - pairing may have already occurred")
+				log.Println("WhatsApp unexpected state - pairing may have already occurred, attempting reconnect")
 				h.Broadcast("whatsapp_status", map[string]any{
-					"status":  "disconnected",
-					"message": "Unexpected connection state. Try refreshing or check if already connected.",
+					"status":  "connecting",
+					"message": "Pairing detected. Attempting to reconnect...",
 				})
-				h.Broadcast("whatsapp_qr", map[string]any{
-					"qr_code_base64": "",
-					"logged_in":      false,
-				})
+
+				go func() {
+					time.Sleep(2 * time.Second)
+					if h.whatsappClient.IsConnected() {
+						log.Println("WhatsApp already connected after unexpected event, notifying UI")
+						h.Broadcast("whatsapp_status", map[string]any{
+							"status":  "connected",
+							"message": "WhatsApp connected successfully",
+						})
+						h.Broadcast("whatsapp_qr", map[string]any{
+							"qr_code_base64": "",
+							"logged_in":      true,
+						})
+						return
+					}
+
+					client := h.GetWhatsAppClient()
+					if client != nil && client.Store.ID != nil {
+						log.Println("Retrying WhatsApp connection with stored credentials after unexpected event")
+						h.Broadcast("whatsapp_status", map[string]any{
+							"status":  "connecting",
+							"message": "Reconnecting with stored credentials...",
+						})
+						if err := h.whatsappClient.Connect(); err != nil {
+							log.Printf("Failed to reconnect after unexpected event: %v", err)
+							h.Broadcast("whatsapp_status", map[string]any{
+								"status":  "disconnected",
+								"message": "Connection failed after pairing. Please try scanning the QR code again.",
+							})
+						} else {
+							log.Println("WhatsApp reconnected successfully after unexpected event")
+							h.Broadcast("whatsapp_status", map[string]any{
+								"status":  "connected",
+								"message": "WhatsApp connected successfully",
+							})
+							h.Broadcast("whatsapp_qr", map[string]any{
+								"qr_code_base64": "",
+								"logged_in":      true,
+							})
+						}
+					} else {
+						h.Broadcast("whatsapp_status", map[string]any{
+							"status":  "disconnected",
+							"message": "Unexpected connection state. Try refreshing the QR code.",
+						})
+						h.Broadcast("whatsapp_qr", map[string]any{
+							"qr_code_base64": "",
+							"logged_in":      false,
+						})
+					}
+				}()
 				break
 			case evt == whatsmeow.QRChannelScannedWithoutMultidevice:
 				h.mu.Lock()

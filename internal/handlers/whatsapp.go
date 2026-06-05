@@ -8,13 +8,32 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"go.mau.fi/whatsmeow"
+	"go.mau.fi/whatsmeow/proto/waCompanionReg"
+	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
 
+type WhatsAppClientManager interface {
+	Disconnect()
+	IsConnected() bool
+}
+
+type whatsAppClientManager struct {
+	client *whatsmeow.Client
+}
+
+func (m *whatsAppClientManager) Disconnect() {
+	m.client.Disconnect()
+}
+
+func (m *whatsAppClientManager) IsConnected() bool {
+	return m.client.IsConnected()
+}
+
 // EventHandler processes WhatsApp connection-related events.
-func EventHandler(evt any, broadcastFunc func(event string, data map[string]any)) {
+func EventHandler(evt any, broadcastFunc func(event string, data map[string]any), clientMgr WhatsAppClientManager) {
 	switch v := evt.(type) {
 	case *events.Connected:
 		log.Info("Connected to WhatsApp")
@@ -27,23 +46,35 @@ func EventHandler(evt any, broadcastFunc func(event string, data map[string]any)
 			"logged_in":      true,
 		})
 	case *events.LoggedOut:
-		log.Info("Logged out from WhatsApp")
+		log.Info("Logged out from WhatsApp - disconnecting and clearing session")
+		if clientMgr.IsConnected() {
+			clientMgr.Disconnect()
+		}
 		broadcastFunc("whatsapp_status", map[string]any{
 			"status":  "disconnected",
-			"message": "WhatsApp logged out",
+			"message": "WhatsApp logged out. Please reconnect by refreshing the QR code.",
 		})
 		broadcastFunc("whatsapp_qr", map[string]any{
 			"qr_code_base64": "",
 			"logged_in":      false,
 		})
 	case *events.StreamReplaced:
-		log.Info("WhatsApp connected from another location")
+		log.Info("WhatsApp connected from another location - disconnecting")
+		if clientMgr.IsConnected() {
+			clientMgr.Disconnect()
+		}
 		broadcastFunc("whatsapp_status", map[string]any{
 			"status":  "disconnected",
-			"message": "WhatsApp connected from another location",
+			"message": "WhatsApp connected from another location. Session replaced.",
 		})
+		broadcastFunc("whatsapp_qr", map[string]any{
+			"qr_code_base64": "",
+			"logged_in":      false,
+		})
+	case *events.PairSuccess:
+		log.Infof("Pair success for device: %s", v.ID)
 	default:
-		log.Infof("Unhandled event: %v", v)
+		log.Debugf("Unhandled WhatsApp event: %T", v)
 	}
 }
 
@@ -80,8 +111,14 @@ func SetupWhatsapp(broadcastFunc func(event string, data map[string]any), regist
 		panic(err)
 	}
 	clientLog := waLog.Stdout("whatapp client", "DEBUG", true)
+
+	store.SetOSInfo("Maya Canteen", [3]uint32{2, 3000, 1040847988})
+	store.DeviceProps.PlatformType = waCompanionReg.DeviceProps_CHROME.Enum()
+
 	client := whatsmeow.NewClient(deviceStore, clientLog)
-	client.AddEventHandler(func(evt any) { EventHandler(evt, broadcastFunc) })
+	client.QRClientType = whatsmeow.PairClientChrome
+	clientMgr := &whatsAppClientManager{client: client}
+	client.AddEventHandler(func(evt any) { EventHandler(evt, broadcastFunc, clientMgr) })
 	registerQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {
 		return client.GetQRChannel(ctx)
 	})

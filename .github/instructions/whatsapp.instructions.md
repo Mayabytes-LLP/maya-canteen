@@ -1,5 +1,5 @@
 ---
-applyTo: '**/*.go'
+applyTo: "**/*.go"
 ---
 
 # WhatsApp Integration Instructions for maya-canteen (2025)
@@ -17,14 +17,14 @@ _For AI coding agents working with WhatsApp/whatsmeow in this codebase._
 ## Key Workflows
 
 - **Send balance notification to a user:**
-	- POST `/api/whatsapp/notify/{id}` with JSON body `{ "message_template": ..., "month": ..., "year": ..., "include_transactions": ... }`.
-	- Handler fetches user, balance, and optionally transaction history, then sends WhatsApp message(s).
+  - POST `/api/whatsapp/notify/{id}` with JSON body `{ "message_template": ..., "month": ..., "year": ..., "include_transactions": ... }`.
+  - Handler fetches user, balance, and optionally transaction history, then sends WhatsApp message(s).
 - **Send notifications to all users:**
-	- POST `/api/whatsapp/notify-all` with similar JSON body.
-	- Iterates all users with balances, sending messages with a delay to avoid rate limits.
+  - POST `/api/whatsapp/notify-all` with similar JSON body.
+  - Iterates all users with balances, sending messages with a delay to avoid rate limits.
 - **WebSocket QR login:**
-	- WebSocket endpoint manages QR code login and connection status for WhatsApp client.
-	- QR channel must be created _before_ calling `Client.Connect()` (see whatsmeow docs).
+  - WebSocket endpoint manages QR code login and connection status for WhatsApp client.
+  - QR channel must be created _before_ calling `Client.Connect()` (see whatsmeow docs).
 
 ## Project-Specific Patterns
 
@@ -45,7 +45,7 @@ _For AI coding agents working with WhatsApp/whatsmeow in this codebase._
 ## Examples
 
 - See `internal/handlers/whatsapp_handler.go` for:
-	- `SendWhatsAppMessage`, `SendDocumentMessage`, `NotifyUserBalance`, `NotifyAllUsersBalances`
+  - `SendWhatsAppMessage`, `SendDocumentMessage`, `NotifyUserBalance`, `NotifyAllUsersBalances`
 - See `internal/server/routes/whatsapp_routes.go` for route registration.
 - See `internal/handlers/websocket_handler.go` for QR login and client management.
 
@@ -56,4 +56,6 @@ _For AI coding agents working with WhatsApp/whatsmeow in this codebase._
 - For rate limits or bans, increase delay or check logs for WhatsApp errors.
 
 ---
+
 For more, see [whatsmeow documentation](https://pkg.go.dev/go.mau.fi/whatsmeow) and project `README.md`.
+
