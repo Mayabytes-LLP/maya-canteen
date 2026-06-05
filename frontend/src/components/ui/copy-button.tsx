@@ -5,8 +5,7 @@ import { useEffect, useState } from "react";
 interface CopyButtonProps extends ButtonProps {
   value: string;
   timeout?: number;
-  src?: string;
-}
+  }
 
 export async function copyToClipboard(text: string) {
   try {
@@ -19,21 +18,20 @@ export async function copyToClipboard(text: string) {
 export function CopyButton({
   value,
   className,
-  src,
   timeout = 3000,
   variant = "ghost",
   ...props
 }: CopyButtonProps) {
   const [hasCopied, setHasCopied] = useState(false);
 
-  // change icon back to clipboard after 1 second
+  // change icon back to clipboard after timeout
   useEffect(() => {
-    setTimeout(() => {
-      if (hasCopied) {
-        setHasCopied(false);
-      }
+    if (!hasCopied) return;
+    const id = setTimeout(() => {
+      setHasCopied(false);
     }, timeout);
-  }, [hasCopied]);
+    return () => clearTimeout(id);
+  }, [hasCopied, timeout]);
 
   return (
     <Button

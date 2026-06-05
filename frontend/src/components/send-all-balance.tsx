@@ -212,7 +212,7 @@ export default function SendAllBalance() {
 				</div>
 				<DialogFooter>
 					<Button
-						onClick={() => {
+						onClick={async () => {
 							const now = Date.now();
 							
 							// Check debounce delay
@@ -227,12 +227,17 @@ export default function SendAllBalance() {
 								.replace(/\{month\}/g, selectedMonth)
 								.replace(/\{year\}/g, selectedYear.toString())
 								.replace(/\{duration\}/g, selectedDuration);
-							sendAllBalanceNotifications(
-								finalMessage,
-								selectedMonth,
-								selectedYear,
-								includeTransactions,
-							);
+							try {
+								await sendAllBalanceNotifications(
+									finalMessage,
+									selectedMonth,
+									selectedYear,
+									includeTransactions,
+								);
+							} catch (err) {
+								toast.error("Failed to send balance notifications");
+								return;
+							}
 							setAllMessageDialogOpen(false);
 						}}
 						disabled={

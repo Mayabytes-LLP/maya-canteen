@@ -501,7 +501,7 @@ export const transactionService = {
 			"including transactions:",
 			includeTransactions,
 		);
-		const requestId = (globalThis.crypto && (globalThis.crypto as any).randomUUID) ? (globalThis.crypto as any).randomUUID() : `rid-${Date.now()}-${Math.floor(Math.random()*100000)}`
+		const requestId = (globalThis.crypto && (globalThis.crypto as { randomUUID?: () => string }).randomUUID) ? (globalThis.crypto as { randomUUID: () => string }).randomUUID() : `rid-${Date.now()}-${Math.floor(Math.random()*100000)}`
 		const response = await fetch(`${API_BASE}/whatsapp/notify/${employeeId}`, {
 			method: "POST",
 			headers: { "Content-Type": "application/json", "X-Request-ID": requestId },
@@ -540,7 +540,7 @@ export const transactionService = {
 		message?: string;
 	}> {
 		// Generate request ID to prevent duplicate bulk operations
-		const requestId = (globalThis.crypto && (globalThis.crypto as any).randomUUID) ? (globalThis.crypto as any).randomUUID() : `rid-${Date.now()}-${Math.floor(Math.random()*100000)}`;
+		const requestId = (globalThis.crypto && (globalThis.crypto as { randomUUID?: () => string }).randomUUID) ? (globalThis.crypto as { randomUUID: () => string }).randomUUID() : `rid-${Date.now()}-${Math.floor(Math.random()*100000)}`;
 		
 		const response = await fetch(`${API_BASE}/whatsapp/notify-all`, {
 			method: "POST",

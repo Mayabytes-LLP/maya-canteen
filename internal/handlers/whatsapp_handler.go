@@ -56,7 +56,9 @@ func (h *WhatsAppHandler) getWhatsAppRecipient(phoneNumber string) (types.JID, e
 		return types.JID{}, fmt.Errorf("WhatsApp client is not initialized")
 	}
 	if !client.IsLoggedIn() {
-		log.Warn("WhatsApp client is not connected. Cannot send message.")
+		return types.JID{}, fmt.Errorf("WhatsApp client is not logged in")
+	}
+	if !client.IsConnected() {
 		return types.JID{}, fmt.Errorf("WhatsApp client is not connected")
 	}
 
@@ -97,11 +99,9 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 		"message":   message,
 	}).Info("Sending WhatsApp message")
 
-	// Create message with current timestamp
+	// Create text message
 	msg := &waProto.Message{
-		ExtendedTextMessage: &waProto.ExtendedTextMessage{
-			Text: proto.String(message),
-		},
+		Conversation: proto.String(message),
 	}
 
 	// Send message with 10-second timeout
@@ -109,7 +109,7 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 	defer cancel()
 
 	client := h.GetWhatsAppClient()
-	_, err = client.SendMessage(ctx, recipient, msg)
+	resp, err := client.SendMessage(ctx, recipient, msg)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"recipient": recipient.String(),
@@ -119,8 +119,10 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 	}
 
 	log.WithFields(log.Fields{
-		"recipient": recipient.String(),
-		"status":    "sent",
+		"recipient":       recipient.String(),
+		"status":          "sent",
+		"serverTimestamp": resp.Timestamp,
+		"messageID":       resp.ID,
 	}).Info("WhatsApp message sent successfully")
 	return nil
 }
@@ -394,26 +396,23 @@ func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Idempotency: check X-Request-ID header to prevent duplicate sends
+	// Layer 1: Check X-Request-ID header for exact duplicate requests
 	requestID := r.Header.Get("X-Request-ID")
-	if requestID == "" {
-		requestID = fmt.Sprintf("rid-%d", time.Now().UnixNano())
-	}
-	whatsappRequestCache.mu.Lock()
-	if _, ok := whatsappRequestCache.m[requestID]; ok {
-		// recent duplicate
-		whatsappRequestCache.mu.Unlock()
-		log.WithFields(log.Fields{"request_id": requestID}).Warn("Duplicate WhatsApp notification request detected; ignoring")
-		resp := map[string]any{
-			"success": true,
-			"message": "Duplicate request ignored",
+	if requestID != "" {
+		whatsappRequestCache.mu.Lock()
+		if _, ok := whatsappRequestCache.m[requestID]; ok {
+			whatsappRequestCache.mu.Unlock()
+			log.WithFields(log.Fields{"request_id": requestID}).Warn("Duplicate WhatsApp notification request detected by request ID; ignoring")
+			resp := map[string]any{
+				"success": true,
+				"message": "Duplicate request ignored",
+			}
+			common.RespondWithJSON(w, http.StatusAccepted, resp)
+			return
 		}
-		common.RespondWithJSON(w, http.StatusAccepted, resp)
-		return
+		whatsappRequestCache.m[requestID] = time.Now()
+		whatsappRequestCache.mu.Unlock()
 	}
-	// mark request id
-	whatsappRequestCache.m[requestID] = time.Now()
-	whatsappRequestCache.mu.Unlock()
 
 	// Parse request body and date range
 	messageTemplate, startDate, endDate, includeTransactions, err := parseBalanceNotificationRequest(r)
@@ -422,6 +421,25 @@ func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Requ
 		common.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	targetKey := "all"
+	if employeeID != 0 {
+		targetKey = fmt.Sprintf("user-%d", employeeID)
+	}
+	contentKey := fmt.Sprintf("notify-%s-%s-%s-%v", targetKey, startDate.Format("2006-01"), endDate.Format("2006-01"), includeTransactions)
+	whatsappRequestCache.mu.Lock()
+	if _, ok := whatsappRequestCache.m[contentKey]; ok {
+		whatsappRequestCache.mu.Unlock()
+		log.WithFields(log.Fields{"content_key": contentKey}).Warn("Duplicate WhatsApp notification request detected by content key; ignoring")
+		resp := map[string]any{
+			"success": true,
+			"message": "Duplicate request ignored",
+		}
+		common.RespondWithJSON(w, http.StatusAccepted, resp)
+		return
+	}
+	whatsappRequestCache.m[contentKey] = time.Now()
+	whatsappRequestCache.mu.Unlock()
 
 	var users []models.User
 	var balances []models.UserBalance
@@ -540,8 +558,10 @@ func (h *WhatsAppHandler) SendDocumentMessage(phoneNumber string, fileName strin
 	}).Info("Sending WhatsApp document")
 
 	client := h.GetWhatsAppClient()
-	// Upload the file to WhatsApp servers
-	uploaded, err := client.Upload(context.Background(), fileData, whatsmeow.MediaDocument)
+	// Upload the file to WhatsApp servers with timeout
+	uploadCtx, uploadCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer uploadCancel()
+	uploaded, err := client.Upload(uploadCtx, fileData, whatsmeow.MediaDocument)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"recipient": recipient.String(),
@@ -551,7 +571,7 @@ func (h *WhatsAppHandler) SendDocumentMessage(phoneNumber string, fileName strin
 		return fmt.Errorf("failed to upload document: %v", err)
 	}
 
-	// Create document message
+	// Create document message using upload response fields
 	msg := &waProto.Message{
 		DocumentMessage: &waProto.DocumentMessage{
 			FileName:      proto.String(fileName),
@@ -560,7 +580,7 @@ func (h *WhatsAppHandler) SendDocumentMessage(phoneNumber string, fileName strin
 			MediaKey:      uploaded.MediaKey,
 			FileEncSHA256: uploaded.FileEncSHA256,
 			FileSHA256:    uploaded.FileSHA256,
-			FileLength:    proto.Uint64(uint64(len(fileData))),
+			FileLength:    proto.Uint64(uploaded.FileLength),
 			URL:           proto.String(uploaded.URL),
 		},
 	}

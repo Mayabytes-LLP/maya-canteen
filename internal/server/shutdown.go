@@ -25,19 +25,23 @@ func GracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whats
 	log.Infoln("Disconnecting ZK device...")
 	zkSocket.Disconnect()
 	log.Infoln("ZK device disconnected")
-	if whatsapp.IsConnected() {
-		log.Infoln("Logging out from WhatsApp...")
-		ctx := context.Background()
-		err := whatsapp.Logout(ctx)
-		if err != nil {
-			log.Errorf("Error logging out from WhatsApp: %v", err)
+	if whatsapp != nil {
+		if whatsapp.IsConnected() {
+			log.Infoln("Logging out from WhatsApp...")
+			ctx := context.Background()
+			err := whatsapp.Logout(ctx)
+			if err != nil {
+				log.Errorf("Error logging out from WhatsApp: %v", err)
+			} else {
+				log.Infoln("WhatsApp logout successful")
+			}
 		} else {
-			log.Infoln("WhatsApp logout successful")
+			log.Infoln("WhatsApp not connected, disconnecting...")
+			whatsapp.Disconnect()
 		}
+	} else {
+		log.Infoln("WhatsApp client is nil, skipping disconnect")
 	}
-	log.Infoln("Disconnecting WhatsApp client...")
-	whatsapp.Disconnect()
-	log.Infoln("WhatsApp client disconnected")
 	log.Infof("Attempting to delete WhatsApp store file: %s", whatsappDbPath)
 	if _, err := os.Stat(whatsappDbPath); err == nil {
 		deleteErr := os.Remove(whatsappDbPath)
