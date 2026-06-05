@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"net/http"
 	"strings"
 	"sync"
@@ -27,7 +28,12 @@ const (
 	textTransactionHeader         = "Transaction History:\n"
 	textTransactionHeaderLine     = "Date | Type | Amount | Description\n"
 	textTransactionSeparator      = "--------------------------------\n"
-	notificationDelay             = 300 * time.Millisecond
+	// notificationDelayMin is the minimum delay between bulk messages.
+	// whatsmeow has no built-in rate limiting; community reports recommend
+	// 1-5+ seconds between messages to avoid TemporaryBan (code 402).
+	notificationDelayMin = 2 * time.Second
+	// notificationDelayMax adds randomization to avoid detection patterns.
+	notificationDelayMax = 5 * time.Second
 )
 
 type Client = whatsmeow.Client
@@ -315,7 +321,8 @@ func parseBalanceNotificationRequest(r *http.Request) (string, time.Time, time.T
 	return messageTemplate, startDate, endDate, body.IncludeTransactions, nil
 }
 
-// sendBalanceNotifications sends notifications to a slice of users and returns success/fail counts and details
+// sendBalanceNotifications sends notifications to a slice of users and returns success/fail counts and details.
+// If delay is true, a randomized delay (2-5 seconds) is added between messages to avoid WhatsApp rate limits.
 func sendBalanceNotifications(
 	h *WhatsAppHandler,
 	users []models.User,
@@ -323,7 +330,8 @@ func sendBalanceNotifications(
 	messageTemplate string,
 	startDate, endDate time.Time,
 	includeTransactions bool,
-	delay time.Duration,
+	delay bool,
+	progressFunc func(sent, total int),
 ) (successCount int, failCount int, failedUsers []string) {
 	if len(users) != len(balances) {
 		log.Errorf("users and balances slices have different lengths: %d vs %d", len(users), len(balances))
@@ -349,8 +357,15 @@ func sendBalanceNotifications(
 		} else {
 			successCount++
 		}
-		if delay > 0 && i < len(users)-1 {
-			time.Sleep(delay)
+		if progressFunc != nil {
+			progressFunc(i+1, len(users))
+		}
+		if delay && i < len(users)-1 {
+			// Randomized delay between notificationDelayMin and notificationDelayMax
+			// to avoid WhatsApp rate limiting and detection patterns.
+			d := notificationDelayMin + rand.N(notificationDelayMax-notificationDelayMin)
+			log.Infof("Bulk notification delay: waiting %v before next message", d)
+			time.Sleep(d)
 		}
 	}
 	return
@@ -441,9 +456,9 @@ func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Requ
 	whatsappRequestCache.m[contentKey] = time.Now()
 	whatsappRequestCache.mu.Unlock()
 
-	var users []models.User
+var users []models.User
 	var balances []models.UserBalance
-	var notificationDelayToUse time.Duration = 0
+	var useDelay bool
 	var target string
 
 	if employeeID != 0 {
@@ -489,27 +504,54 @@ func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Requ
 				Balance: balance.Balance,
 			})
 		}
-		notificationDelayToUse = notificationDelay
+		useDelay = true
 		target = "all users"
 	}
 
-	successCount, failCount, failedUsers := sendBalanceNotifications(h, users, balances, messageTemplate, startDate, endDate, includeTransactions, notificationDelayToUse)
+	// For single user, send synchronously
+	if employeeID != 0 {
+		successCount, failCount, failedUsers := sendBalanceNotifications(h, users, balances, messageTemplate, startDate, endDate, includeTransactions, false, nil)
 
-	// Consistent response structure for both single and all
-	resp := map[string]any{
-		"success": failCount == 0,
-		"message": fmt.Sprintf("Sent %d notification(s) to %s, %d failed", successCount, target, failCount),
-		"details": map[string]any{
-			"success_count": successCount,
-			"fail_count":    failCount,
-			"failed_users":  failedUsers,
-		},
+		resp := map[string]any{
+			"success": failCount == 0,
+			"message": fmt.Sprintf("Sent %d notification(s) to %s, %d failed", successCount, target, failCount),
+			"details": map[string]any{
+				"success_count": successCount,
+				"fail_count":    failCount,
+				"failed_users":  failedUsers,
+			},
+		}
+		status := http.StatusOK
+		if failCount > 0 {
+			status = http.StatusInternalServerError
+		}
+		common.RespondWithJSON(w, status, resp)
+		return
 	}
-	status := http.StatusOK
-	if failCount > 0 {
-		status = http.StatusInternalServerError
-	}
-	common.RespondWithJSON(w, status, resp)
+
+	// For bulk (all users), send asynchronously to avoid HTTP timeout.
+	// With randomized 2-5s delays per user, sending to N users takes ~3.5N seconds,
+	// which easily exceeds the 30s HTTP write timeout.
+	totalUsers := len(users)
+
+	// Respond immediately with processing status
+	common.RespondWithJSON(w, http.StatusAccepted, map[string]any{
+		"success":     true,
+		"message":     fmt.Sprintf("Sending notifications to %d users in the background", totalUsers),
+		"total_users": totalUsers,
+	})
+
+	// Send in background goroutine
+	go func() {
+		log.Infof("Starting bulk notification for %d users (background)", totalUsers)
+		successCount, failCount, failedUsers := sendBalanceNotifications(h, users, balances, messageTemplate, startDate, endDate, includeTransactions, useDelay, func(sent, total int) {
+			log.Infof("Bulk notification progress: %d/%d sent", sent, total)
+		})
+		log.Infof("Bulk notification complete: %d success, %d failed out of %d users", successCount, failCount, totalUsers)
+		if failCount > 0 {
+			log.Warnf("Failed users: %v", failedUsers)
+		}
+	}()
 }
 
 // NotifyUserBalance handles sending WhatsApp notification to a single user

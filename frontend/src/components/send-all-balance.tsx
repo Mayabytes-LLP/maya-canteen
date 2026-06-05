@@ -74,27 +74,14 @@ export default function SendAllBalance() {
 				includeTransactions,
 			);
 			if (response.success && response.data) {
-				// Show success message with details
-				const failedUsers = response.data.results.filter(r => !r.success);
+				// Bulk notifications are now processed asynchronously
+				// The server returns 202 Accepted immediately
+				const totalUsers = response.data.total_users ?? 0;
 				toast.success(
-					<div className="space-y-2">
-						<p>{response.data.message}</p>
-						{failedUsers.length > 0 && (
-							<div className="text-sm">
-								<p className="font-semibold">Failed Users:</p>
-								<ul className="list-disc pl-4">
-									{failedUsers.map((result) => (
-										<li key={result.employee_id}>
-											{result.employee_id}: {result.error || "Unknown error"}
-										</li>
-									))}
-								</ul>
-							</div>
-						)}
-					</div>,
+					`Notifications are being sent to ${totalUsers} users in the background. This may take a few minutes.`,
 				);
 			} else {
-				toast.error("Failed to send balance notifications to all users");
+				toast.error(response.message || "Failed to send balance notifications to all users");
 			}
 		} catch (error) {
 			console.error("Error sending all balance notifications:", error);

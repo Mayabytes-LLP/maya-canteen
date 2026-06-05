@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"maya-canteen/internal/gozk"
+	"maya-canteen/internal/handlers"
 	"net/http"
 	"os"
 	"os/signal"
@@ -10,11 +11,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"go.mau.fi/whatsmeow"
 )
 
-// GracefulShutdown handles cleanup and shutdown of all services.
-func GracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whatsmeow.Client, whatsappDbPath string, done chan bool) {
+func GracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp handlers.WhatsAppClient, whatsappDbPath string, done chan bool) {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	<-ctx.Done()
@@ -28,8 +27,8 @@ func GracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp *whats
 	if whatsapp != nil {
 		if whatsapp.IsConnected() {
 			log.Infoln("Logging out from WhatsApp...")
-			ctx := context.Background()
-			err := whatsapp.Logout(ctx)
+			logoutCtx := context.Background()
+			err := whatsapp.Logout(logoutCtx)
 			if err != nil {
 				log.Errorf("Error logging out from WhatsApp: %v", err)
 			} else {

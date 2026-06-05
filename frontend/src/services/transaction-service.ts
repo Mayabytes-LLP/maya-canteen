@@ -536,6 +536,7 @@ export const transactionService = {
 			}>;
 			message: string;
 			success: boolean;
+			total_users?: number;
 		};
 		message?: string;
 	}> {
@@ -563,6 +564,8 @@ export const transactionService = {
 		}
 
 		const data = await response.json();
-		return { success: true, data: data.data };
+		// Bulk notifications are now async (202 Accepted)
+		// The response contains { success, message, total_users }
+		return { success: true, data: data };
 	},
 };

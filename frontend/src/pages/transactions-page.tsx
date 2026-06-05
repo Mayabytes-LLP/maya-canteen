@@ -1,4 +1,4 @@
-import { LoaderCircle, RefreshCw } from "lucide-react";
+import { LoaderCircle, Phone, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useContext, useState } from "react";
 import { toast } from "sonner";
@@ -25,8 +25,13 @@ export default function TransactionsPage() {
 	const [inputLimit, setInputLimit] = useState("10");
 	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	const { whatsappQR, whatsappStatus, ws, whatsappClientInfo } =
+	const { whatsappQR, whatsappPairingCode, whatsappStatus, ws, whatsappClientInfo } =
 		useContext(AppContext);
+
+	// Pairing mode: "qr" or "phone"
+	const [pairingMode, setPairingMode] = useState<"qr" | "phone">("qr");
+	const [phoneNumber, setPhoneNumber] = useState("");
+	const [isPairing, setIsPairing] = useState(false);
 
 	// Function to trigger a refresh of the transaction list
 	const handleTransactionAdded = () => {
@@ -48,7 +53,33 @@ export default function TransactionsPage() {
 		}
 	};
 
-	// Function to manually refresh the WhatsApp connection
+	// Function to pair WhatsApp with phone number
+	const pairWithPhone = () => {
+		const phone = phoneNumber.trim();
+		if (!phone) {
+			toast.error("Please enter a phone number");
+			return;
+		}
+		if (ws.current?.isConnected()) {
+			setIsPairing(true);
+			const success = ws.current.send({
+				type: "pair_phone",
+				phone: phone,
+			});
+			if (success) {
+				toast.info("Initiating phone pairing...");
+			} else {
+				toast.error("Failed to send pairing request");
+				setIsPairing(false);
+				return;
+			}
+			setTimeout(() => {
+				setIsPairing(false);
+			}, 30000);
+		} else {
+			toast.error("WebSocket not connected");
+		}
+	};
 	const refreshWhatsApp = () => {
 		if (whatsappStatus.connected) {
 			toast.info("WhatsApp is already connected. No need to refresh.");
@@ -161,11 +192,13 @@ export default function TransactionsPage() {
 								<div>
 									<CardTitle>WhatsApp Connection</CardTitle>
 									<CardDescription>
-										{whatsappQR
-											? "Scan the QR code to login with WhatsApp"
-											: whatsappStatus.connected
-												? "WhatsApp is connected and ready to send messages"
-												: "Click refresh to connect WhatsApp"}
+										{whatsappPairingCode
+											? "Enter the pairing code on your phone"
+											: whatsappQR
+												? "Scan the QR code to login with WhatsApp"
+												: whatsappStatus.connected
+													? "WhatsApp is connected and ready to send messages"
+													: "Connect WhatsApp using QR code or phone number"}
 									</CardDescription>
 								</div>
 								<Badge
@@ -179,7 +212,74 @@ export default function TransactionsPage() {
 							</div>
 						</CardHeader>
 						<CardContent className="flex flex-col items-center">
-							{whatsappQR ? (
+							{!whatsappStatus.connected && (
+								<div className="flex gap-2 mb-4 w-full max-w-sm">
+									<Button
+										variant={pairingMode === "qr" ? "default" : "outline"}
+										size="sm"
+										className="flex-1"
+										onClick={() => setPairingMode("qr")}
+									>
+										QR Code
+									</Button>
+									<Button
+										variant={pairingMode === "phone" ? "default" : "outline"}
+										size="sm"
+										className="flex-1"
+										onClick={() => setPairingMode("phone")}
+									>
+										<Phone className="h-4 w-4 mr-1" />
+										Phone Number
+									</Button>
+								</div>
+							)}
+
+							{whatsappPairingCode ? (
+								<div className="flex flex-col items-center p-6 bg-white rounded-lg w-full max-w-sm">
+									<p className="text-sm text-muted-foreground mb-3 text-center">
+										Enter this code on your phone to link WhatsApp:
+									</p>
+									<p className="text-3xl font-mono font-bold tracking-[0.3em] text-center select-all">
+										{whatsappPairingCode}
+									</p>
+									<p className="text-xs text-muted-foreground mt-3 text-center">
+										Open WhatsApp → Linked Devices → Link with phone number
+									</p>
+								</div>
+							) : pairingMode === "phone" && !whatsappStatus.connected ? (
+								<div className="flex flex-col items-center gap-4 w-full max-w-sm">
+									<p className="text-sm text-muted-foreground text-center">
+										Enter your phone number to receive a pairing code
+									</p>
+									<div className="flex gap-2 w-full">
+										<Input
+											type="tel"
+											placeholder="923001234567"
+											value={phoneNumber}
+											onChange={(e) => setPhoneNumber(e.target.value)}
+											disabled={isPairing}
+											className="flex-1"
+										/>
+										<Button
+											onClick={pairWithPhone}
+											disabled={isPairing || !phoneNumber.trim()}
+										>
+											{isPairing ? (
+												<>
+													<LoaderCircle className="h-4 w-4 mr-1 animate-spin" />
+													Pairing...
+												</>
+											) : (
+												"Link"
+											)}
+										</Button>
+									</div>
+									<p className="text-xs text-muted-foreground text-center">
+										Use international format without + or leading 0 (e.g.,
+										923001234567)
+									</p>
+								</div>
+							) : whatsappQR ? (
 								<div className="flex flex-col items-center w-full bg-white p-4 rounded-lg">
 									<div className="p-4 rounded-lg shadow-lg">
 										<QRCodeSVG
@@ -215,10 +315,10 @@ export default function TransactionsPage() {
 								</div>
 							) : (
 								<div className="text-center p-4">
-									<p className="text-lg">WhatsApp QR Code not available</p>
+									<p className="text-lg">WhatsApp not connected</p>
 									<p className="text-sm text-muted-foreground mt-1">
 										{whatsappStatus.message ||
-											"WhatsApp authentication is pending."}
+											"Click Connect WhatsApp to get started."}
 									</p>
 								</div>
 							)}

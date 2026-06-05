@@ -15,6 +15,7 @@ export interface AppState {
 	setAdmin: (admin: boolean) => void;
 	ws: React.RefObject<ReconnectingWebSocket | null>;
 	whatsappQR: string | null;
+	whatsappPairingCode: string | null;
 }
 
 export const initialState: AppState = {
@@ -30,6 +31,7 @@ export const initialState: AppState = {
 	setAdmin: () => null,
 	ws: { current: null },
 	whatsappQR: null,
+	whatsappPairingCode: null,
 };
 
 export const AppContext = createContext<AppState>(initialState);

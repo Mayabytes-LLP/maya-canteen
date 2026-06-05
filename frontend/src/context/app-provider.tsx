@@ -20,6 +20,9 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 	);
 	const [currentUser, setCurrentUser] = useState(initialState.currentUser);
 	const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
+	const [whatsappPairingCode, setWhatsappPairingCode] = useState<string | null>(
+		null,
+	);
 	const [whatsappStatus, setWhatsappStatus] = useState(
 		initialState.whatsappStatus,
 	);
@@ -113,6 +116,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 								if (logged_in) {
 									// Already logged in, no need for QR code
 									setWhatsappQR(null);
+									setWhatsappPairingCode(null);
 									toast.success("WhatsApp is already logged in");
 								} else if (!qr_code_base64 || qr_code_base64 === "") {
 									// No QR code or empty QR code
@@ -120,9 +124,27 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 								} else {
 									// Valid QR code received, set it for display
 									setWhatsappQR(qr_code_base64);
+									setWhatsappPairingCode(null);
 									toast.info(
 										"WhatsApp QR code refreshed. Please scan to login.",
 									);
+								}
+								break;
+							}
+							case "whatsapp_pairing_code": {
+								console.log("WhatsApp pairing code received:", message);
+								const { code, phone } = message.payload as {
+									code: string;
+									phone: string;
+								};
+								if (code) {
+									setWhatsappPairingCode(code);
+									setWhatsappQR(null);
+									toast.success(
+										`Pairing code generated${phone ? ` for ${phone}` : ""}. Enter it on your phone.`,
+									);
+								} else {
+									setWhatsappPairingCode(null);
 								}
 								break;
 							}
@@ -146,6 +168,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 								setWhatsappClientInfo(client_info || null);
 
 								if (status === "connected") {
+									setWhatsappPairingCode(null);
 									toast.success(statusMessage || "WhatsApp connected");
 								} else {
 									toast.error(statusMessage || "WhatsApp disconnected");
@@ -215,6 +238,7 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 		zkDeviceStatus,
 		ws,
 		whatsappQR,
+		whatsappPairingCode,
 		whatsappStatus,
 		whatsappClientInfo,
 	};

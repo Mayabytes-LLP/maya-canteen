@@ -11,6 +11,7 @@ import (
 	"go.mau.fi/whatsmeow/proto/waCompanionReg"
 	"go.mau.fi/whatsmeow/store"
 	"go.mau.fi/whatsmeow/store/sqlstore"
+	"go.mau.fi/whatsmeow/types"
 	"go.mau.fi/whatsmeow/types/events"
 	waLog "go.mau.fi/whatsmeow/util/log"
 )
@@ -32,7 +33,6 @@ func (m *whatsAppClientManager) IsConnected() bool {
 	return m.client.IsConnected()
 }
 
-// EventHandler processes WhatsApp connection-related events.
 func EventHandler(evt any, broadcastFunc func(event string, data map[string]any), clientMgr WhatsAppClientManager) {
 	switch v := evt.(type) {
 	case *events.Connected:
@@ -71,14 +71,11 @@ func EventHandler(evt any, broadcastFunc func(event string, data map[string]any)
 			"qr_code_base64": "",
 			"logged_in":      false,
 		})
-	case *events.PairSuccess:
-		log.Infof("Pair success for device: %s", v.ID)
 	default:
 		log.Debugf("Unhandled WhatsApp event: %T", v)
 	}
 }
 
-// GetWhatsappPath returns both the database URI for SQLite and the actual file path.
 func GetWhatsappPath() (dbUri string, filePath string) {
 	absPath, err := filepath.Abs("./whatsapp-store.db")
 	if err != nil {
@@ -94,7 +91,6 @@ func GetWhatsappPath() (dbUri string, filePath string) {
 	return dbUri, filePath
 }
 
-// SetupWhatsapp initializes the WhatsApp client and registers event handlers.
 func SetupWhatsapp(broadcastFunc func(event string, data map[string]any), registerQRChannelGetter func(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error))) (*whatsmeow.Client, string) {
 	dbLog := waLog.Stdout("Database", "INFO", true)
 	dbUri, filePath := GetWhatsappPath()
@@ -131,4 +127,47 @@ func SetupWhatsapp(broadcastFunc func(event string, data map[string]any), regist
 		"logged_in":      false,
 	})
 	return client, filePath
+}
+
+func NewWhatsAppClientInterface(client *whatsmeow.Client) WhatsAppClient {
+	return &whatsmeowClientWrapper{client: client}
+}
+
+type whatsmeowClientWrapper struct {
+	client *whatsmeow.Client
+}
+
+func (w *whatsmeowClientWrapper) Logout(ctx context.Context) error {
+	return w.client.Logout(ctx)
+}
+
+func (w *whatsmeowClientWrapper) Connect() error {
+	return w.client.Connect()
+}
+
+func (w *whatsmeowClientWrapper) IsConnected() bool {
+	return w.client.IsConnected()
+}
+
+func (w *whatsmeowClientWrapper) IsLoggedIn() bool {
+	return w.client.IsLoggedIn()
+}
+
+func (w *whatsmeowClientWrapper) Disconnect() {
+	w.client.Disconnect()
+}
+
+func (w *whatsmeowClientWrapper) GetStoreID() *types.JID {
+	if w.client.Store == nil {
+		return nil
+	}
+	return w.client.Store.ID
+}
+
+func (w *whatsmeowClientWrapper) GetClient() *whatsmeow.Client {
+	return w.client
+}
+
+func (w *whatsmeowClientWrapper) PairPhone(ctx context.Context, phone string) (string, error) {
+	return w.client.PairPhone(ctx, phone, true, whatsmeow.PairClientChrome, "Chrome (Linux)")
 }
