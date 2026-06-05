@@ -185,7 +185,7 @@ export default function TransactionsPage() {
 										<QRCodeSVG
 											value={whatsappQR}
 											size={400}
-											level="L"
+											level="Q"
 											bgColor="#ffffff"
 											fgColor="#000000"
 											marginSize={10}
