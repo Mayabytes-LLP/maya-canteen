@@ -146,19 +146,16 @@ export default function TransactionsPage() {
 		}
 		if (ws.current?.isConnected()) {
 			setIsRefreshing(true);
-			refreshTimeoutRef.current = setTimeout(() => {
-				setIsRefreshing(false);
-				refreshTimeoutRef.current = null;
-				toast.error("Connection timed out — server did not respond");
-			}, 30000);
 			const success = ws.current.send({ type: "refresh_whatsapp" });
-			if (!success) {
+			if (success) {
+				refreshTimeoutRef.current = setTimeout(() => {
+					setIsRefreshing(false);
+					refreshTimeoutRef.current = null;
+					toast.error("Connection timed out — server did not respond");
+				}, 30000);
+			} else {
 				toast.error("Failed to send refresh command");
 				setIsRefreshing(false);
-				if (refreshTimeoutRef.current) {
-					clearTimeout(refreshTimeoutRef.current);
-					refreshTimeoutRef.current = null;
-				}
 			}
 		} else {
 			toast.error("WebSocket not connected");
