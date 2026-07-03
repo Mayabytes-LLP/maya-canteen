@@ -23,8 +23,8 @@ build-windows:
 # Run the application
 run:
 	@go run cmd/api/main.go &
-	@pnpm install --prefer-offline --prefix ./frontend
-	@pnpm run dev --prefix ./frontend
+	@cd frontend && pnpm install --prefer-offline
+	@cd frontend && pnpm run dev
 # Create DB container
 docker-run:
 	@if docker compose up --build 2>/dev/null; then \
