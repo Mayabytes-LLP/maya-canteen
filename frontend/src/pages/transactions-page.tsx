@@ -1,6 +1,6 @@
-import { LoaderCircle, Phone, RefreshCw } from "lucide-react";
+import { CheckCircle2, LoaderCircle, Phone, QrCode, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { toast } from "sonner";
 import DepositForm from "@/components/deposit-form";
 import ErrorBoundary from "@/components/error-boundary";
@@ -19,31 +19,68 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppContext } from "@/context";
 
+function statusBadgeVariant(status: {
+	connected: boolean;
+	message: string;
+}): "default" | "secondary" | "destructive" | "outline" {
+	if (status.connected) return "default";
+	if (status.message?.toLowerCase().includes("connecting")) return "secondary";
+	return "destructive";
+}
+
+function statusBadgeClass(status: {
+	connected: boolean;
+	message: string;
+}): string {
+	if (status.connected) return "bg-green-600 text-white";
+	if (status.message?.toLowerCase().includes("connecting")) return "";
+	return "bg-red-600 text-white";
+}
+
+function statusLabel(status: { connected: boolean; message: string }): string {
+	if (status.connected) return "Connected";
+	if (status.message?.toLowerCase().includes("connecting")) return "Connecting…";
+	return "Disconnected";
+}
+
 export default function TransactionsPage() {
 	const [refreshTrigger, setRefreshTrigger] = useState(0);
 	const [transactionLimit, setTransactionLimit] = useState(50);
 	const [inputLimit, setInputLimit] = useState("10");
-	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	const { whatsappQR, whatsappPairingCode, whatsappStatus, ws, whatsappClientInfo } =
-		useContext(AppContext);
+	const {
+		whatsappQR,
+		whatsappPairingCode,
+		whatsappStatus,
+		ws,
+		whatsappClientInfo,
+	} = useContext(AppContext);
 
-	// Pairing mode: "qr" or "phone"
 	const [pairingMode, setPairingMode] = useState<"qr" | "phone">("qr");
 	const [phoneNumber, setPhoneNumber] = useState("");
 	const [isPairing, setIsPairing] = useState(false);
+	const [isRefreshing, setIsRefreshing] = useState(false);
 
-	// Function to trigger a refresh of the transaction list
+	useEffect(() => {
+		if (whatsappStatus.connected || whatsappQR || whatsappPairingCode) {
+			setIsRefreshing(false);
+		}
+	}, [whatsappStatus.connected, whatsappQR, whatsappPairingCode]);
+
+	useEffect(() => {
+		if (whatsappPairingCode || whatsappStatus.connected) {
+			setIsPairing(false);
+		}
+	}, [whatsappPairingCode, whatsappStatus.connected]);
+
 	const handleTransactionAdded = () => {
 		setRefreshTrigger((prev) => prev + 1);
 	};
 
-	// Handle limit change
 	const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		setInputLimit(e.target.value);
 	};
 
-	// Apply the new limit
 	const applyLimit = () => {
 		const limit = parseInt(inputLimit);
 		if (!Number.isNaN(limit) && limit > 0) {
@@ -53,7 +90,6 @@ export default function TransactionsPage() {
 		}
 	};
 
-	// Function to pair WhatsApp with phone number
 	const pairWithPhone = () => {
 		const phone = phoneNumber.trim();
 		if (!phone) {
@@ -71,41 +107,33 @@ export default function TransactionsPage() {
 			} else {
 				toast.error("Failed to send pairing request");
 				setIsPairing(false);
-				return;
 			}
-			setTimeout(() => {
-				setIsPairing(false);
-			}, 30000);
 		} else {
 			toast.error("WebSocket not connected");
 		}
 	};
+
 	const refreshWhatsApp = () => {
 		if (whatsappStatus.connected) {
-			toast.info("WhatsApp is already connected. No need to refresh.");
+			toast.info("WhatsApp is already connected.");
 			return;
 		}
 		if (ws.current?.isConnected()) {
 			setIsRefreshing(true);
-			// Send refresh command to backend
 			const success = ws.current.send({ type: "refresh_whatsapp" });
-			if (success) {
-				toast.info("Connecting to WhatsApp...");
-			} else {
+			if (!success) {
 				toast.error("Failed to send refresh command");
 				setIsRefreshing(false);
-				return;
 			}
-
-			// Set a timeout to reset the refreshing state after a reasonable time
-			setTimeout(() => {
-				setIsRefreshing(false);
-			}, 30000); // Reset after 30 seconds max
 		} else {
 			toast.error("WebSocket not connected");
-			setIsRefreshing(false);
 		}
 	};
+
+	const isConnecting =
+		isRefreshing ||
+		isPairing ||
+		whatsappStatus.message?.toLowerCase().includes("connecting");
 
 	return (
 		<div className="container mx-auto py-6 space-y-6">
@@ -186,6 +214,7 @@ export default function TransactionsPage() {
 							</Button>
 						</CardFooter>
 					</Card>
+
 					<Card>
 						<CardHeader>
 							<div className="flex justify-between items-center">
@@ -195,151 +224,182 @@ export default function TransactionsPage() {
 										{whatsappPairingCode
 											? "Enter the pairing code on your phone"
 											: whatsappQR
-												? "Scan the QR code to login with WhatsApp"
+												? "Scan the QR code to link WhatsApp"
 												: whatsappStatus.connected
-													? "WhatsApp is connected and ready to send messages"
-													: "Connect WhatsApp using QR code or phone number"}
+													? "WhatsApp is ready to send messages"
+													: isConnecting
+														? whatsappStatus.message || "Connecting…"
+														: "Connect WhatsApp via QR code or phone number"}
 									</CardDescription>
 								</div>
 								<Badge
-									variant={whatsappStatus.connected ? "default" : "destructive"}
-									className={`${
-										whatsappStatus.connected ? "bg-green-600" : "bg-red-600"
-									} text-white`}
+									variant={statusBadgeVariant(whatsappStatus)}
+									className={statusBadgeClass(whatsappStatus)}
 								>
-									{whatsappStatus.connected ? "Connected" : "Disconnected"}
+									{statusLabel(whatsappStatus)}
 								</Badge>
 							</div>
 						</CardHeader>
-						<CardContent className="flex flex-col items-center">
-							{!whatsappStatus.connected && (
-								<div className="flex gap-2 mb-4 w-full max-w-sm">
-									<Button
-										variant={pairingMode === "qr" ? "default" : "outline"}
-										size="sm"
-										className="flex-1"
-										onClick={() => setPairingMode("qr")}
-									>
-										QR Code
-									</Button>
-									<Button
-										variant={pairingMode === "phone" ? "default" : "outline"}
-										size="sm"
-										className="flex-1"
-										onClick={() => setPairingMode("phone")}
-									>
-										<Phone className="h-4 w-4 mr-1" />
-										Phone Number
-									</Button>
-								</div>
-							)}
-
-							{whatsappPairingCode ? (
-								<div className="flex flex-col items-center p-6 bg-white rounded-lg w-full max-w-sm">
-									<p className="text-sm text-muted-foreground mb-3 text-center">
-										Enter this code on your phone to link WhatsApp:
+						<CardContent className="flex flex-col items-center min-h-[200px] justify-center">
+							{whatsappStatus.connected ? (
+								<div className="text-center p-4 space-y-3">
+									<CheckCircle2 className="h-10 w-10 text-green-500 mx-auto" />
+									<p className="font-medium text-green-700 dark:text-green-400">
+										WhatsApp is connected
 									</p>
-									<p className="text-3xl font-mono font-bold tracking-[0.3em] text-center select-all">
-										{whatsappPairingCode}
-									</p>
-									<p className="text-xs text-muted-foreground mt-3 text-center">
-										Open WhatsApp → Linked Devices → Link with phone number
-									</p>
-								</div>
-							) : pairingMode === "phone" && !whatsappStatus.connected ? (
-								<div className="flex flex-col items-center gap-4 w-full max-w-sm">
-									<p className="text-sm text-muted-foreground text-center">
-										Enter your phone number to receive a pairing code
-									</p>
-									<div className="flex gap-2 w-full">
-										<Input
-											type="tel"
-											placeholder="923001234567"
-											value={phoneNumber}
-											onChange={(e) => setPhoneNumber(e.target.value)}
-											disabled={isPairing}
-											className="flex-1"
-										/>
-										<Button
-											onClick={pairWithPhone}
-											disabled={isPairing || !phoneNumber.trim()}
-										>
-											{isPairing ? (
-												<>
-													<LoaderCircle className="h-4 w-4 mr-1 animate-spin" />
-													Pairing...
-												</>
-											) : (
-												"Link"
-											)}
-										</Button>
-									</div>
-									<p className="text-xs text-muted-foreground text-center">
-										Use international format without + or leading 0 (e.g.,
-										923001234567)
-									</p>
-								</div>
-							) : whatsappQR ? (
-								<div className="flex flex-col items-center w-full bg-white p-4 rounded-lg">
-									<div className="p-4 rounded-lg shadow-lg">
-										<QRCodeSVG
-											value={whatsappQR}
-											size={400}
-											level="Q"
-											bgColor="#ffffff"
-											fgColor="#000000"
-											marginSize={10}
-										/>
-									</div>
-									<p className="mt-4 text-sm text-muted-foreground">
-										Scan with WhatsApp to login
-									</p>
-								</div>
-							) : whatsappStatus.connected ? (
-								<div className="text-center p-4">
 									{whatsappClientInfo && (
-										<div className="mb-2 text-xs text-muted-foreground">
-											<div>
-												<b>Client Info:</b>
-											</div>
-											{Object.entries(whatsappClientInfo).map(
-												([key, value]) => (
-													<div key={key}>
-														<span className="font-mono">{key}</span>:{" "}
-														{String(value)}
-													</div>
-												),
+										<div className="text-xs text-muted-foreground space-y-0.5 mt-2">
+											{whatsappClientInfo.connected === true && (
+												<>
+													{whatsappClientInfo.user != null && (
+														<div>
+															<span className="font-medium">Phone:</span>{" "}
+															<span className="font-mono">
+																{String(whatsappClientInfo.user)}
+															</span>
+														</div>
+													)}
+													{whatsappClientInfo.platform != null && (
+														<div>
+															<span className="font-medium">Device:</span>{" "}
+															{String(whatsappClientInfo.platform)}
+														</div>
+													)}
+												</>
 											)}
 										</div>
 									)}
 								</div>
-							) : (
-								<div className="text-center p-4">
-									<p className="text-lg">WhatsApp not connected</p>
-									<p className="text-sm text-muted-foreground mt-1">
-										{whatsappStatus.message ||
-											"Click Connect WhatsApp to get started."}
+							) : isConnecting && !whatsappQR && !whatsappPairingCode ? (
+								<div className="text-center p-4 space-y-3">
+									<LoaderCircle className="h-10 w-10 text-muted-foreground animate-spin mx-auto" />
+									<p className="font-medium text-muted-foreground">
+										{whatsappStatus.message || "Connecting to WhatsApp…"}
+									</p>
+									<p className="text-xs text-muted-foreground/60">
+										Please wait while we establish a connection
 									</p>
 								</div>
+							) : whatsappPairingCode ? (
+								<div className="flex flex-col items-center p-6 border rounded-lg w-full max-w-sm">
+									<Phone className="h-8 w-8 text-blue-500 mb-2" />
+									<p className="text-sm text-muted-foreground mb-4 text-center">
+										Enter this code on your phone to link WhatsApp:
+									</p>
+									<div className="bg-muted px-8 py-4 rounded-md w-full">
+										<p className="text-4xl font-mono font-bold tracking-[0.3em] text-center select-all">
+											{whatsappPairingCode}
+										</p>
+									</div>
+									<div className="mt-4 text-xs text-muted-foreground space-y-1">
+										<p className="text-center">
+											Open <span className="font-medium">WhatsApp</span> →{" "}
+											<span className="font-medium">Linked Devices</span> →{" "}
+											<span className="font-medium">
+												Link with phone number
+											</span>
+										</p>
+									</div>
+								</div>
+							) : whatsappQR ? (
+								<div className="flex flex-col items-center w-full p-4">
+									<div className="bg-white p-3 rounded-xl shadow-md border">
+										<QRCodeSVG
+											value={whatsappQR}
+											size={280}
+											level="Q"
+											bgColor="#ffffff"
+											fgColor="#000000"
+											marginSize={8}
+										/>
+									</div>
+									<p className="mt-4 text-sm text-muted-foreground">
+										Scan with WhatsApp to link this device
+									</p>
+									<p className="text-xs text-muted-foreground/60 mt-1">
+										Open WhatsApp → Linked Devices → Link a Device
+									</p>
+								</div>
+							) : (
+								<>
+									{!whatsappStatus.connected && (
+										<div className="flex gap-2 mb-6 w-full max-w-xs">
+											<Button
+												variant={pairingMode === "qr" ? "default" : "outline"}
+												size="sm"
+												className="flex-1"
+												onClick={() => setPairingMode("qr")}
+											>
+												<QrCode className="h-4 w-4 mr-1" />
+												QR Code
+											</Button>
+											<Button
+												variant={
+													pairingMode === "phone" ? "default" : "outline"
+												}
+												size="sm"
+												className="flex-1"
+												onClick={() => setPairingMode("phone")}
+											>
+												<Phone className="h-4 w-4 mr-1" />
+												Phone Number
+											</Button>
+										</div>
+									)}
+
+									{pairingMode === "phone" && !whatsappStatus.connected ? (
+										<div className="flex flex-col items-center gap-4 w-full max-w-sm">
+											<p className="text-sm text-muted-foreground text-center">
+												Enter your phone number to receive a pairing code
+											</p>
+											<div className="flex gap-2 w-full">
+												<Input
+													type="tel"
+													placeholder="923001234567"
+													value={phoneNumber}
+													onChange={(e) => setPhoneNumber(e.target.value)}
+													disabled={isPairing}
+													className="flex-1"
+												/>
+												<Button
+													onClick={pairWithPhone}
+													disabled={isPairing || !phoneNumber.trim()}
+												>
+													{isPairing ? (
+														<>
+															<LoaderCircle className="h-4 w-4 mr-1 animate-spin" />
+															Pairing…
+														</>
+													) : (
+														"Link"
+													)}
+												</Button>
+											</div>
+											<p className="text-xs text-muted-foreground text-center">
+												Use international format without + or leading 0 (e.g.,{" "}
+												<code className="font-mono">923001234567</code>)
+											</p>
+										</div>
+									) : null}
+								</>
 							)}
 						</CardContent>
 						<CardFooter className="flex justify-center">
 							<Button
 								variant="outline"
 								onClick={refreshWhatsApp}
-								className="flex gap-2 items-center"
-								disabled={isRefreshing}
+								disabled={isConnecting}
 							>
-								{isRefreshing ? (
+								{isConnecting ? (
 									<>
-										<LoaderCircle className="h-4 w-4 animate-spin" />
-										Connecting...
+										<LoaderCircle className="h-4 w-4 mr-2 animate-spin" />
+										Connecting…
 									</>
 								) : (
 									<>
-										<RefreshCw className="h-4 w-4" />
+										<RefreshCw className="h-4 w-4 mr-2" />
 										{whatsappStatus.connected
-											? "Refresh Connection"
+											? "Refresh"
 											: "Connect WhatsApp"}
 									</>
 								)}
