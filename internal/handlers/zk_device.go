@@ -11,13 +11,23 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func DefaultZKPort() int {
+	port := os.Getenv("ZK_PORT")
+	if port == "" {
+		return 4370
+	}
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		log.Infof("Error parsing ZK_PORT=%q, using default port 4370", port)
+		return 4370
+	}
+	return p
+}
+
 // SetupZKDevice initializes and manages the ZK device connection and event capture.
 // Accepts a broadcastFunc to decouple from routes and avoid import cycles.
 func SetupZKDevice(eventLogger *logStd.Logger, broadcastFunc func(event string, data map[string]any)) *gozk.ZK {
-	port := os.Getenv("ZK_PORT")
-	if port == "" {
-		port = "4370"
-	}
+	portInt := DefaultZKPort()
 	ip := os.Getenv("ZK_IP")
 	if ip == "" {
 		ip = "192.168.1.153"
@@ -25,11 +35,6 @@ func SetupZKDevice(eventLogger *logStd.Logger, broadcastFunc func(event string, 
 	timezone := os.Getenv("ZK_TIMEZONE")
 	if timezone == "" {
 		timezone = "0"
-	}
-	portInt, err := strconv.Atoi(port)
-	if err != nil {
-		log.Infof("Error parsing ZK_PORT: %v,/n using default port 4370", err)
-		portInt = 4370
 	}
 
 	zkSocket := gozk.NewZK(ip, portInt, 0, gozk.DefaultTimezone)

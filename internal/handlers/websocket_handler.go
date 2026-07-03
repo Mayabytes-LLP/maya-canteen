@@ -413,7 +413,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			return
 		}
 
-		qrChan, err := h.getQRChannel(context.Background())
+		qrCtx, qrCancel := context.WithCancel(context.Background())
+		defer qrCancel()
+		qrChan, err := h.getQRChannel(qrCtx)
 		if err != nil {
 			log.Printf("Failed to get QR channel: %v", err)
 			h.Broadcast("whatsapp_status", map[string]any{

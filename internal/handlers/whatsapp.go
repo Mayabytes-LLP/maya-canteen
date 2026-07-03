@@ -113,6 +113,18 @@ func SetupWhatsapp(broadcastFunc func(event string, data map[string]any), regist
 
 	client := whatsmeow.NewClient(deviceStore, clientLog)
 	client.QRClientType = whatsmeow.PairClientChrome
+	client.EnableAutoReconnect = true
+	client.InitialAutoReconnect = true
+	client.AutoReconnectHook = func(err error) bool {
+		log.Warnf("WhatsApp auto-reconnect failed (%d attempts so far): %v", client.AutoReconnectErrors, err)
+		return client.AutoReconnectErrors < 5
+	}
+	client.SynchronousAck = true
+	client.UseRetryMessageStore = true
+	client.PrePairCallback = func(jid types.JID, platform, businessName string) bool {
+		log.Infof("WhatsApp pairing with %s (platform: %s, business: %s)", jid, platform, businessName)
+		return true
+	}
 	clientMgr := &whatsAppClientManager{client: client}
 	client.AddEventHandler(func(evt any) { EventHandler(evt, broadcastFunc, clientMgr) })
 	registerQRChannelGetter(func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error) {

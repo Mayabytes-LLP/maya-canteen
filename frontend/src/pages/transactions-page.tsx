@@ -1,6 +1,6 @@
 import { CheckCircle2, LoaderCircle, Phone, QrCode, RefreshCw } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import DepositForm from "@/components/deposit-form";
 import ErrorBoundary from "@/components/error-boundary";
@@ -60,18 +60,39 @@ export default function TransactionsPage() {
 	const [phoneNumber, setPhoneNumber] = useState("");
 	const [isPairing, setIsPairing] = useState(false);
 	const [isRefreshing, setIsRefreshing] = useState(false);
+	const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const pairingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
 		if (whatsappStatus.connected || whatsappQR || whatsappPairingCode) {
 			setIsRefreshing(false);
+			if (refreshTimeoutRef.current) {
+				clearTimeout(refreshTimeoutRef.current);
+				refreshTimeoutRef.current = null;
+			}
 		}
 	}, [whatsappStatus.connected, whatsappQR, whatsappPairingCode]);
 
 	useEffect(() => {
 		if (whatsappPairingCode || whatsappStatus.connected) {
 			setIsPairing(false);
+			if (pairingTimeoutRef.current) {
+				clearTimeout(pairingTimeoutRef.current);
+				pairingTimeoutRef.current = null;
+			}
 		}
 	}, [whatsappPairingCode, whatsappStatus.connected]);
+
+	useEffect(() => {
+		return () => {
+			if (refreshTimeoutRef.current) {
+				clearTimeout(refreshTimeoutRef.current);
+			}
+			if (pairingTimeoutRef.current) {
+				clearTimeout(pairingTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	const handleTransactionAdded = () => {
 		setRefreshTrigger((prev) => prev + 1);
@@ -103,6 +124,11 @@ export default function TransactionsPage() {
 				phone: phone,
 			});
 			if (success) {
+				pairingTimeoutRef.current = setTimeout(() => {
+					setIsPairing(false);
+					pairingTimeoutRef.current = null;
+					toast.error("Pairing timed out — no response from server");
+				}, 30000);
 				toast.info("Initiating phone pairing...");
 			} else {
 				toast.error("Failed to send pairing request");
@@ -120,10 +146,19 @@ export default function TransactionsPage() {
 		}
 		if (ws.current?.isConnected()) {
 			setIsRefreshing(true);
+			refreshTimeoutRef.current = setTimeout(() => {
+				setIsRefreshing(false);
+				refreshTimeoutRef.current = null;
+				toast.error("Connection timed out — server did not respond");
+			}, 30000);
 			const success = ws.current.send({ type: "refresh_whatsapp" });
 			if (!success) {
 				toast.error("Failed to send refresh command");
 				setIsRefreshing(false);
+				if (refreshTimeoutRef.current) {
+					clearTimeout(refreshTimeoutRef.current);
+					refreshTimeoutRef.current = null;
+				}
 			}
 		} else {
 			toast.error("WebSocket not connected");

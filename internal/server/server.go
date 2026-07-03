@@ -19,11 +19,16 @@ type Server struct {
 	whatsappClient handlers.WhatsAppClient
 }
 
-func NewServer(whatsappClient handlers.WhatsAppClient) *http.Server {
+func DefaultPort() int {
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	if port == 0 {
-		port = 8080
+		return 8080
 	}
+	return port
+}
+
+func NewServer(whatsappClient handlers.WhatsAppClient) *http.Server {
+	port := DefaultPort()
 
 	s := &Server{
 		port:           port,

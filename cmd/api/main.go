@@ -6,10 +6,20 @@ import (
 	"maya-canteen/internal/handlers"
 	"maya-canteen/internal/server"
 	"maya-canteen/internal/server/routes"
+	"net"
 	"os"
+	"strconv"
 
 	"go.mau.fi/whatsmeow"
 )
+
+func mustListen(port int) net.Listener {
+	ln, err := net.Listen("tcp", ":"+strconv.Itoa(port))
+	if err != nil {
+		panic("Failed to listen on port " + strconv.Itoa(port) + ": " + err.Error())
+	}
+	return ln
+}
 
 func main() {
 	logFile, err := server.SetupLogFile("zk_events.log")
@@ -28,6 +38,7 @@ func main() {
 
 	zkSocket := handlers.SetupZKDevice(eventLogger, broadcastFunc)
 
+	listener := mustListen(server.DefaultPort())
 	apiServer := server.NewServer(nil)
 
 	whatsapp, whatsappDbPath := handlers.SetupWhatsapp(
@@ -49,7 +60,7 @@ func main() {
 	log := logFile
 	_ = log
 
-	if err := apiServer.ListenAndServe(); err != nil {
+	if err := apiServer.Serve(listener); err != nil {
 		panic("Failed to start API server: " + err.Error())
 	}
 
