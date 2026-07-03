@@ -121,7 +121,7 @@ export default function TransactionsPage() {
 			setIsPairing(true);
 			const success = ws.current.send({
 				type: "pair_phone",
-				phone: phone,
+				payload: { phone },
 			});
 			if (success) {
 				pairingTimeoutRef.current = setTimeout(() => {
