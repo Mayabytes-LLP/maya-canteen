@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	defaultBalanceMessageTemplate = "**Balance Update** \n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) {duration} of Canteen bill for {month} {year}\n\nThis is an automated message from Maya Canteen Management System.\n\nAfter the payment share the screenshot.\n\n{transactions}"
+	defaultBalanceMessageTemplate = "*Balance Update*\n\nDear {name},\nYour current canteen balance is: *PKR {balance}*\n\nPlease pay online via Jazz Cash 03422949447 (Syed Kazim Raza) {duration} of Canteen bill for {month} {year}\n\nThis is an automated message from Maya Canteen Management System.\n\nAfter the payment share the screenshot.\n\n{transactions}"
 	csvHeader                     = "Date,Type,Amount,Description\n"
 	textTransactionHeader         = "Transaction History:\n"
 	textTransactionHeaderLine     = "Date | Type | Amount | Description\n"
@@ -55,6 +55,31 @@ func NewWhatsAppHandler(db database.Service, getClient func() *whatsmeow.Client)
 	}
 }
 
+// normalizePhone converts a stored phone number into the "+<country><number>"
+// international format that whatsmeow's IsOnWhatsApp requires. Numbers with a
+// leading single 0 are treated as Pakistani local numbers (03xx... -> +923xx...) and bare 3xxxxxxxxx as Pakistani mobiles.
+func normalizePhone(phone string) (string, error) {
+	digits := strings.Map(func(r rune) rune {
+		if r >= '0' && r <= '9' {
+			return r
+		}
+		return -1
+	}, phone)
+	switch {
+	case strings.HasPrefix(strings.TrimSpace(phone), "00"):
+		digits = strings.TrimPrefix(digits, "00")
+	case strings.HasPrefix(digits, "0"):
+		digits = "92" + strings.TrimLeft(digits, "0")
+	}
+	if len(digits) == 10 && strings.HasPrefix(digits, "3") {
+		digits = "92" + digits // bare Pakistani mobile, e.g. 3422949447
+	}
+	if len(digits) < 8 || len(digits) > 15 {
+		return "", fmt.Errorf("invalid phone number %q", phone)
+	}
+	return "+" + digits, nil
+}
+
 // getWhatsAppRecipient checks client status and validates the recipient's phone number.
 func (h *WhatsAppHandler) getWhatsAppRecipient(phoneNumber string) (types.JID, error) {
 	client := h.GetWhatsAppClient()
@@ -68,7 +93,15 @@ func (h *WhatsAppHandler) getWhatsAppRecipient(phoneNumber string) (types.JID, e
 		return types.JID{}, fmt.Errorf("WhatsApp client is not connected")
 	}
 
-	results, err := client.IsOnWhatsApp(context.Background(), []string{phoneNumber})
+	normalized, err := normalizePhone(phoneNumber)
+	if err != nil {
+		return types.JID{}, err
+	}
+	phoneNumber = normalized
+
+	checkCtx, checkCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer checkCancel()
+	results, err := client.IsOnWhatsApp(checkCtx, []string{phoneNumber})
 	if err != nil {
 		return types.JID{}, fmt.Errorf("failed to check WhatsApp status for %s: %v", phoneNumber, err)
 	}
@@ -88,8 +121,7 @@ func (h *WhatsAppHandler) getWhatsAppRecipient(phoneNumber string) (types.JID, e
 func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error {
 	log.WithFields(log.Fields{
 		"phoneNumber": phoneNumber,
-		"message":     message,
-	}).Info("SendWhatsAppMessage called with params")
+	}).Info("SendWhatsAppMessage called")
 
 	recipient, err := h.getWhatsAppRecipient(phoneNumber)
 	if err != nil {
@@ -102,7 +134,6 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 
 	log.WithFields(log.Fields{
 		"recipient": recipient.String(),
-		"message":   message,
 	}).Info("Sending WhatsApp message")
 
 	// Create text message
@@ -134,12 +165,15 @@ func (h *WhatsAppHandler) SendWhatsAppMessage(phoneNumber, message string) error
 }
 
 // formatBalanceMessage formats the balance notification message with user details
-func (h *WhatsAppHandler) formatBalanceMessage(template string, name string, balance float64) string {
+func (h *WhatsAppHandler) formatBalanceMessage(template string, name string, balance float64, period time.Time) string {
 	var builder strings.Builder
 	builder.WriteString(template)
 	message := builder.String()
 	message = strings.ReplaceAll(message, "{name}", name)
 	message = strings.ReplaceAll(message, "{balance}", fmt.Sprintf("%.2f", balance))
+	message = strings.ReplaceAll(message, "{month}", period.Format("January"))
+	message = strings.ReplaceAll(message, "{year}", fmt.Sprintf("%d", period.Year()))
+	message = strings.ReplaceAll(message, "{duration}", "the full amount")
 	return message
 }
 
@@ -189,7 +223,7 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 		"includeTransactions": includeTransactions,
 	}).Info("sendBalanceNotification called with params")
 
-	message := h.formatBalanceMessage(messageTemplate, user.Name, float64(userBalance.Balance))
+	message := h.formatBalanceMessage(messageTemplate, user.Name, float64(userBalance.Balance), startDate)
 
 	var combinedMessage string
 	var csvContent string
@@ -218,7 +252,6 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 			"user_id":           user.ID,
 			"user_name":         user.Name,
 			"transaction_count": len(userTransactions),
-			"transactions":      userTransactions,
 		}).Info("User transactions for sendBalanceNotification")
 
 		if len(userTransactions) > 0 {
@@ -248,7 +281,6 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 		"user_id":            user.ID,
 		"user_name":          user.Name,
 		"user_phone":         user.Phone,
-		"final_message":      combinedMessage,
 		"csvContent_present": csvContent != "",
 	}).Info("Final WhatsApp message before sending")
 
@@ -271,7 +303,6 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 			"user_name":  user.Name,
 			"user_phone": user.Phone,
 			"fileName":   fileName,
-			"csvContent": csvContent,
 		}).Info("Sending WhatsApp CSV document")
 		if err := h.SendDocumentMessage(user.Phone, fileName, []byte(csvContent), "text/csv"); err != nil {
 			log.WithFields(log.Fields{
@@ -280,8 +311,7 @@ func (h *WhatsAppHandler) sendBalanceNotification(user models.User, userBalance 
 				"user_phone": user.Phone,
 				"fileName":   fileName,
 				"error":      err,
-			}).Error("Failed to send transaction CSV in sendBalanceNotification")
-			return fmt.Errorf("failed to send transaction CSV: %v", err)
+			}).Error("Failed to send transaction CSV in sendBalanceNotification (balance text was already delivered; not reporting failure to avoid a duplicate on retry)")
 		}
 	}
 
@@ -342,8 +372,18 @@ func sendBalanceNotifications(
 		return
 	}
 
+	sentTo := make(map[string]string) // normalized phone -> first user name
 	for i, user := range users {
 		userBalance := balances[i]
+		if norm, nerr := normalizePhone(user.Phone); nerr == nil {
+			if first, dup := sentTo[norm]; dup {
+				log.Warnf("Skipping %s: phone %s already notified for %s in this run", user.Name, norm, first)
+				failCount++
+				failedUsers = append(failedUsers, fmt.Sprintf("%s (duplicate phone number: same number as %s, skipped to avoid sending twice)", user.Name, first))
+				continue
+			}
+			sentTo[norm] = user.Name
+		}
 		if user.Phone == "" {
 			failCount++
 			failedUsers = append(failedUsers, fmt.Sprintf("%s (no phone number)", user.Name))
@@ -381,6 +421,36 @@ var whatsappRequestCache = struct {
 	m: make(map[string]time.Time),
 }
 
+// claimNotificationKey records key in the dedup cache and reports whether the
+// caller is the first to claim it (false means a duplicate).
+func claimNotificationKey(key string) bool {
+	whatsappRequestCache.mu.Lock()
+	defer whatsappRequestCache.mu.Unlock()
+	if _, ok := whatsappRequestCache.m[key]; ok {
+		return false
+	}
+	whatsappRequestCache.m[key] = time.Now()
+	return true
+}
+
+// refreshNotificationKey (re)sets key's timestamp atomically.
+func refreshNotificationKey(key string) {
+	whatsappRequestCache.mu.Lock()
+	defer whatsappRequestCache.mu.Unlock()
+	whatsappRequestCache.m[key] = time.Now()
+}
+
+// releaseNotificationKeys forgets keys so the same request can be retried.
+func releaseNotificationKeys(keys ...string) {
+	whatsappRequestCache.mu.Lock()
+	defer whatsappRequestCache.mu.Unlock()
+	for _, k := range keys {
+		if k != "" {
+			delete(whatsappRequestCache.m, k)
+		}
+	}
+}
+
 func cleanupWhatsappRequestCache() {
 	whatsappRequestCache.mu.Lock()
 	defer whatsappRequestCache.mu.Unlock()
@@ -413,21 +483,24 @@ func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Requ
 
 	// Layer 1: Check X-Request-ID header for exact duplicate requests
 	requestID := r.Header.Get("X-Request-ID")
-	if requestID != "" {
-		whatsappRequestCache.mu.Lock()
-		if _, ok := whatsappRequestCache.m[requestID]; ok {
-			whatsappRequestCache.mu.Unlock()
-			log.WithFields(log.Fields{"request_id": requestID}).Warn("Duplicate WhatsApp notification request detected by request ID; ignoring")
-			resp := map[string]any{
-				"success": true,
-				"message": "Duplicate request ignored",
-			}
-			common.RespondWithJSON(w, http.StatusAccepted, resp)
-			return
-		}
-		whatsappRequestCache.m[requestID] = time.Now()
-		whatsappRequestCache.mu.Unlock()
+	if requestID != "" && !claimNotificationKey(requestID) {
+		log.WithFields(log.Fields{"request_id": requestID}).Warn("Duplicate WhatsApp notification request detected by request ID; ignoring")
+		common.RespondWithJSON(w, http.StatusAccepted, map[string]any{
+			"success": true,
+			"message": "Duplicate request ignored",
+		})
+		return
 	}
+
+	// Release the dedup keys if the request fails before anything is sent, so the
+	// user can retry immediately instead of waiting out the cache TTL.
+	var contentKey string
+	keepKey := false
+	defer func() {
+		if !keepKey {
+			releaseNotificationKeys(contentKey, requestID)
+		}
+	}()
 
 	// Parse request body and date range
 	messageTemplate, startDate, endDate, includeTransactions, err := parseBalanceNotificationRequest(r)
@@ -441,22 +514,20 @@ func (h *WhatsAppHandler) notifyUserBalances(w http.ResponseWriter, r *http.Requ
 	if employeeID != 0 {
 		targetKey = fmt.Sprintf("user-%d", employeeID)
 	}
-	contentKey := fmt.Sprintf("notify-%s-%s-%s-%v", targetKey, startDate.Format("2006-01"), endDate.Format("2006-01"), includeTransactions)
-	whatsappRequestCache.mu.Lock()
-	if _, ok := whatsappRequestCache.m[contentKey]; ok {
-		whatsappRequestCache.mu.Unlock()
-		log.WithFields(log.Fields{"content_key": contentKey}).Warn("Duplicate WhatsApp notification request detected by content key; ignoring")
-		resp := map[string]any{
+	key := fmt.Sprintf("notify-%s-%s-%s-%v", targetKey, startDate.Format("2006-01"), endDate.Format("2006-01"), includeTransactions)
+	if !claimNotificationKey(key) {
+		log.WithFields(log.Fields{"content_key": key}).Warn("Duplicate WhatsApp notification request detected by content key; ignoring")
+		// contentKey stays empty so the deferred release only drops our request ID,
+		// never the key owned by the original request.
+		common.RespondWithJSON(w, http.StatusAccepted, map[string]any{
 			"success": true,
 			"message": "Duplicate request ignored",
-		}
-		common.RespondWithJSON(w, http.StatusAccepted, resp)
+		})
 		return
 	}
-	whatsappRequestCache.m[contentKey] = time.Now()
-	whatsappRequestCache.mu.Unlock()
+	contentKey = key
 
-var users []models.User
+	var users []models.User
 	var balances []models.UserBalance
 	var useDelay bool
 	var target string
@@ -525,9 +596,17 @@ var users []models.User
 		if failCount > 0 {
 			status = http.StatusInternalServerError
 		}
+		keepKey = failCount == 0
 		common.RespondWithJSON(w, status, resp)
 		return
 	}
+
+	// Bulk: only one run at a time, held until the background goroutine finishes.
+	if !bulkOperationMutex.TryLock() {
+		common.RespondWithError(w, http.StatusConflict, "A bulk notification is already in progress")
+		return
+	}
+	keepKey = true
 
 	// For bulk (all users), send asynchronously to avoid HTTP timeout.
 	// With randomized 2-5s delays per user, sending to N users takes ~3.5N seconds,
@@ -543,8 +622,27 @@ var users []models.User
 
 	// Send in background goroutine
 	go func() {
+		defer bulkOperationMutex.Unlock()
+		successCount := 0
+		defer func() {
+			panicked := false
+			if rec := recover(); rec != nil {
+				panicked = true
+				log.Errorf("Panic in bulk WhatsApp notification: %v", rec)
+			}
+			if successCount > 0 || panicked {
+				// Restart the dedup window from the end of the run (runs outlive the TTL).
+				// After a panic we can't know who already got a message, so keep the key.
+				refreshNotificationKey(contentKey)
+			} else {
+				// Nothing went out (e.g. WhatsApp dropped): allow an immediate retry.
+				releaseNotificationKeys(contentKey, requestID)
+			}
+		}()
 		log.Infof("Starting bulk notification for %d users (background)", totalUsers)
-		successCount, failCount, failedUsers := sendBalanceNotifications(h, users, balances, messageTemplate, startDate, endDate, includeTransactions, useDelay, func(sent, total int) {
+		var failCount int
+		var failedUsers []string
+		successCount, failCount, failedUsers = sendBalanceNotifications(h, users, balances, messageTemplate, startDate, endDate, includeTransactions, useDelay, func(sent, total int) {
 			log.Infof("Bulk notification progress: %d/%d sent", sent, total)
 		})
 		log.Infof("Bulk notification complete: %d success, %d failed out of %d users", successCount, failCount, totalUsers)
@@ -568,11 +666,9 @@ func (h *WhatsAppHandler) NotifyUserBalance(w http.ResponseWriter, r *http.Reque
 
 // NotifyAllUsersBalances handles sending WhatsApp notifications to all users
 func (h *WhatsAppHandler) NotifyAllUsersBalances(w http.ResponseWriter, r *http.Request) {
-	// Acquire global lock to prevent concurrent bulk operations
-	bulkOperationMutex.Lock()
-	defer bulkOperationMutex.Unlock()
-
-	log.Info("Starting bulk WhatsApp notification operation (with global lock)")
+	// The global bulk lock is acquired inside notifyUserBalances and held until the
+	// background send finishes (not merely until the HTTP response is written).
+	log.Info("Starting bulk WhatsApp notification operation")
 	h.notifyUserBalances(w, r, 0)
 }
 

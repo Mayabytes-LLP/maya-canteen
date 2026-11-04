@@ -41,21 +41,34 @@ func main() {
 	listener := mustListen(server.DefaultPort())
 	apiServer := server.NewServer(nil)
 
-	whatsapp, whatsappDbPath := handlers.SetupWhatsapp(
+	whatsapp, _ := handlers.SetupWhatsapp(
 		broadcastFunc,
 		func(getter func(ctx context.Context) (<-chan whatsmeow.QRChannelItem, error)) {
 			routes.GlobalWebSocketHandler.RegisterQRChannelGetter(getter)
 		},
+		func(fresh handlers.WhatsAppClient, getter handlers.QRChannelGetter) {
+			routes.GlobalWebSocketHandler.ReplaceWhatsAppClient(fresh, getter)
+		},
 	)
 
 	whatsappInterface := handlers.NewWhatsAppClientInterface(whatsapp)
+
+	// A session is kept across restarts, so reconnect a paired client right away
+	// (whatsmeow's auto-reconnect only applies after a first Connect).
+	if whatsapp.Store != nil && whatsapp.Store.ID != nil {
+		go func() {
+			if err := whatsapp.Connect(); err != nil {
+				logStd.Printf("Failed to connect stored WhatsApp session: %v", err)
+			}
+		}()
+	}
 
 	if routes.GlobalWebSocketHandler != nil {
 		routes.GlobalWebSocketHandler.UpdateWhatsAppClient(whatsappInterface)
 	}
 
 	done := make(chan bool, 1)
-	go server.GracefulShutdown(apiServer, zkSocket, whatsappInterface, whatsappDbPath, done)
+	go server.GracefulShutdown(apiServer, zkSocket, routes.GlobalWebSocketHandler.GetWhatsAppClient, done)
 
 	log := logFile
 	_ = log

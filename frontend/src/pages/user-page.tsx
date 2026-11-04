@@ -185,7 +185,7 @@ export default function UserPage() {
                   name: "John Doe",
                   employee_id: "12345",
                   department: "Development",
-                  phone: "+923001234567",
+                  phone: "+923422949447",
                   active: "true",
                 },
                 {

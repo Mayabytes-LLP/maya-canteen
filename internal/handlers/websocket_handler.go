@@ -49,7 +49,7 @@ type WebsocketHandler struct {
 	mu                   sync.RWMutex
 	whatsappClient       WhatsAppClient
 	getQRChannel         QRChannelGetter
-	connectionGeneration  uint64
+	connectionGeneration uint64
 	connectionInProgress bool
 	pairingPhone         string
 	healthTicker         *time.Ticker
@@ -63,7 +63,7 @@ type WSMessage struct {
 
 func NewWebSocketHandler(db database.Service, client WhatsAppClient) *WebsocketHandler {
 	handler := &WebsocketHandler{
-		BaseHandler:   common.NewBaseHandler(db),
+		BaseHandler: common.NewBaseHandler(db),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -169,7 +169,17 @@ func (h *WebsocketHandler) updateClientPing(clientID string) {
 	}
 }
 
+// ReplaceWhatsAppClient atomically swaps the client together with its matching QR getter.
+func (h *WebsocketHandler) ReplaceWhatsAppClient(client WhatsAppClient, getter QRChannelGetter) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.whatsappClient = client
+	h.getQRChannel = getter
+}
+
 func (h *WebsocketHandler) RegisterQRChannelGetter(getter QRChannelGetter) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.getQRChannel = getter
 }
 
@@ -288,14 +298,14 @@ func (h *WebsocketHandler) handlePhonePairing(phone string) {
 	if len(cleaned) <= 6 {
 		h.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
-			"message": "Phone number must be more than 6 digits (use international format, e.g., 923001234567)",
+			"message": "Phone number must be more than 6 digits (use international format, e.g., +92 342 2949447)",
 		})
 		return
 	}
 	if strings.HasPrefix(cleaned, "0") {
 		h.Broadcast("whatsapp_status", map[string]any{
 			"status":  "disconnected",
-			"message": "Phone number must not start with 0 (use international format, e.g., 923001234567)",
+			"message": "Phone number must not start with 0 (use international format, e.g., +92 342 2949447)",
 		})
 		return
 	}
@@ -304,7 +314,7 @@ func (h *WebsocketHandler) handlePhonePairing(phone string) {
 	if h.connectionInProgress {
 		h.mu.Unlock()
 		h.Broadcast("whatsapp_status", map[string]any{
-			"status":  "disconnected",
+			"status":  "connecting",
 			"message": "Connection attempt already in progress. Please wait.",
 		})
 		return
@@ -316,7 +326,14 @@ func (h *WebsocketHandler) handlePhonePairing(phone string) {
 }
 
 func (h *WebsocketHandler) handleWhatsAppRefresh() {
-	if h.whatsappClient == nil {
+	// Snapshot the client and its matching QR getter together: the client can be
+	// swapped at runtime (e.g. after a remote logout).
+	h.mu.RLock()
+	wa := h.whatsappClient
+	getQRChannel := h.getQRChannel
+	h.mu.RUnlock()
+
+	if wa == nil {
 		log.Println("WhatsApp client not initialized")
 		h.Broadcast("whatsapp_status", map[string]any{
 			"status":      "disconnected",
@@ -331,7 +348,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 		log.Println("WhatsApp connection already in progress, ignoring request")
 		h.mu.Unlock()
 		h.Broadcast("whatsapp_status", map[string]any{
-			"status":  "disconnected",
+			"status":  "connecting",
 			"message": "Connection attempt already in progress",
 		})
 		return
@@ -354,7 +371,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	pairingPhone := h.pairingPhone
 	h.mu.RUnlock()
 
-	if h.whatsappClient.IsConnected() {
+	if wa.IsConnected() {
 		log.Println("WhatsApp is already connected")
 		clearProgress()
 		h.Broadcast("whatsapp_status", map[string]any{
@@ -370,9 +387,9 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	}
 
 	// If already connected but not paired, and in phone pairing mode, call PairPhone directly
-	if pairingPhone != "" && h.whatsappClient.GetStoreID() == nil {
+	if pairingPhone != "" && wa.GetStoreID() == nil {
 		// Not connected and not paired — will connect and call PairPhone via QR channel below
-	} else if h.whatsappClient.GetStoreID() != nil {
+	} else if wa.GetStoreID() != nil {
 		log.Println("WhatsApp credentials found, connecting directly...")
 		h.Broadcast("whatsapp_status", map[string]any{
 			"status":      "connecting",
@@ -382,7 +399,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 
 		go func() {
 			defer clearProgress()
-			if err := h.whatsappClient.Connect(); err != nil {
+			if err := wa.Connect(); err != nil {
 				log.Printf("Failed to connect to WhatsApp: %v", err)
 				h.Broadcast("whatsapp_status", map[string]any{
 					"status":      "disconnected",
@@ -396,7 +413,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 
 	log.Println("Attempting to connect to WhatsApp...")
 	h.Broadcast("whatsapp_status", map[string]any{
-		"status":      "disconnected",
+		"status":      "connecting",
 		"message":     "Connecting to WhatsApp...",
 		"client_info": h.getClientInfo(),
 	})
@@ -404,7 +421,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 	go func() {
 		defer clearProgress()
 
-		if h.getQRChannel == nil {
+		if getQRChannel == nil {
 			log.Println("QR channel getter not registered")
 			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
@@ -415,7 +432,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 
 		qrCtx, qrCancel := context.WithCancel(context.Background())
 		defer qrCancel()
-		qrChan, err := h.getQRChannel(qrCtx)
+		qrChan, err := getQRChannel(qrCtx)
 		if err != nil {
 			log.Printf("Failed to get QR channel: %v", err)
 			h.Broadcast("whatsapp_status", map[string]any{
@@ -425,7 +442,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			return
 		}
 
-		if err := h.whatsappClient.Connect(); err != nil {
+		if err := wa.Connect(); err != nil {
 			log.Printf("Failed to connect to WhatsApp: %v", err)
 			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
@@ -441,7 +458,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			case evt.Event == "code" && evt.Code != "":
 				if pairingPhone != "" && !pairingCodeSent {
 					// Phone pairing mode: call PairPhone on first QR code
-					code, err := h.whatsappClient.PairPhone(context.Background(), pairingPhone)
+					code, err := wa.PairPhone(context.Background(), pairingPhone)
 					if err != nil {
 						log.Printf("Failed to pair phone %s: %v", pairingPhone, err)
 						h.Broadcast("whatsapp_status", map[string]any{
@@ -543,7 +560,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 			}
 		}
 
-		if !qrCodeShown && !h.whatsappClient.IsConnected() {
+		if !qrCodeShown && !wa.IsConnected() {
 			h.Broadcast("whatsapp_status", map[string]any{
 				"status":  "disconnected",
 				"message": "Could not generate QR code. Please try again later.",
@@ -554,7 +571,7 @@ func (h *WebsocketHandler) handleWhatsAppRefresh() {
 
 func (h *WebsocketHandler) getClientInfo() map[string]any {
 	info := map[string]any{}
-	client := h.whatsappClient
+	client := h.GetWhatsAppClient()
 	if client == nil {
 		info["status"] = "not_initialized"
 		return info

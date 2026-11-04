@@ -22,24 +22,26 @@ import { AppContext } from "@/context";
 function statusBadgeVariant(status: {
 	connected: boolean;
 	message: string;
+	status?: string;
 }): "default" | "secondary" | "destructive" | "outline" {
 	if (status.connected) return "default";
-	if (status.message?.toLowerCase().includes("connecting")) return "secondary";
+	if (status.status === "connecting" || status.message?.toLowerCase().includes("connecting")) return "secondary";
 	return "destructive";
 }
 
 function statusBadgeClass(status: {
 	connected: boolean;
 	message: string;
+	status?: string;
 }): string {
 	if (status.connected) return "bg-green-600 text-white";
-	if (status.message?.toLowerCase().includes("connecting")) return "";
+	if (status.status === "connecting" || status.message?.toLowerCase().includes("connecting")) return "";
 	return "bg-red-600 text-white";
 }
 
-function statusLabel(status: { connected: boolean; message: string }): string {
+function statusLabel(status: { connected: boolean; message: string; status?: string }): string {
 	if (status.connected) return "Connected";
-	if (status.message?.toLowerCase().includes("connecting")) return "Connecting…";
+	if (status.status === "connecting" || status.message?.toLowerCase().includes("connecting")) return "Connecting…";
 	return "Disconnected";
 }
 
@@ -62,6 +64,21 @@ export default function TransactionsPage() {
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pairingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// A failure status ("disconnected" after a request) ends any pending spinner
+	// instead of waiting for the 30s timeout.
+	useEffect(() => {
+		if (whatsappStatus.status === "disconnected" && whatsappStatus.updatedAt) {
+			setIsRefreshing(false);
+			setIsPairing(false);
+			for (const ref of [refreshTimeoutRef, pairingTimeoutRef]) {
+				if (ref.current) {
+					clearTimeout(ref.current);
+					ref.current = null;
+				}
+			}
+		}
+	}, [whatsappStatus.status, whatsappStatus.updatedAt]);
 
 	useEffect(() => {
 		if (whatsappStatus.connected || whatsappQR || whatsappPairingCode) {
@@ -165,6 +182,7 @@ export default function TransactionsPage() {
 	const isConnecting =
 		isRefreshing ||
 		isPairing ||
+		whatsappStatus.status === "connecting" ||
 		whatsappStatus.message?.toLowerCase().includes("connecting");
 
 	return (
@@ -387,7 +405,7 @@ export default function TransactionsPage() {
 											<div className="flex gap-2 w-full">
 												<Input
 													type="tel"
-													placeholder="923001234567"
+													placeholder="+92 342 2949447"
 													value={phoneNumber}
 													onChange={(e) => setPhoneNumber(e.target.value)}
 													disabled={isPairing}
@@ -408,8 +426,8 @@ export default function TransactionsPage() {
 												</Button>
 											</div>
 											<p className="text-xs text-muted-foreground text-center">
-												Use international format without + or leading 0 (e.g.,{" "}
-												<code className="font-mono">923001234567</code>)
+												Use international format with country code, no leading 0 (e.g.,{" "}
+												<code className="font-mono">+92 342 2949447</code>)
 											</p>
 										</div>
 									) : null}

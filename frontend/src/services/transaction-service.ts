@@ -514,8 +514,14 @@ export const transactionService = {
 		});
 
 		if (!response.ok) {
-			const error = await response.json();
-			return { success: false, message: error.message };
+			const error = await response.json().catch(() => ({ message: `Request failed (${response.status})` }));
+			// RespondWithError is top-level, RespondWithJSON nests under `data`.
+			return { success: false, message: error.message ?? error.data?.message };
+		}
+
+		const body = await response.json().catch(() => null);
+		if (response.status === 202 && body?.data?.message === "Duplicate request ignored") {
+			return { success: false, message: "This notification was already sent recently; nothing was sent again." };
 		}
 
 		return { success: true };
@@ -559,11 +565,15 @@ export const transactionService = {
 		});
 
 		if (!response.ok) {
-			const error = await response.json();
-			return { success: false, message: error.message };
+			const error = await response.json().catch(() => ({ message: `Request failed (${response.status})` }));
+			return { success: false, message: error.message ?? error.data?.message };
 		}
 
-		const data = await response.json();
+		const envelope = await response.json();
+		const data = envelope?.data ?? envelope;
+		if (data?.message === "Duplicate request ignored") {
+			return { success: false, message: "Bulk notification for this month was already started/sent recently; nothing was sent again." };
+		}
 		// Bulk notifications are now async (202 Accepted)
 		// The response contains { success, message, total_users }
 		return { success: true, data: data };
