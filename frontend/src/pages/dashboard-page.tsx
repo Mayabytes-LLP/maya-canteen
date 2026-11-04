@@ -282,7 +282,7 @@ const DashboardPage = () => {
 				);
 				setNotificationDialogOpen(false);
 			} else {
-				toast.error("Failed to send balance notification");
+				toast.error(response.message || "Failed to send balance notification");
 			}
 		} catch (error) {
 			console.error("Error sending balance notification:", error);

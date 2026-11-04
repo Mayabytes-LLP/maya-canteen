@@ -138,7 +138,7 @@ export default function UserBalances({
 				);
 				setNotificationDialogOpen(false);
 			} else {
-				toast.error("Failed to send balance notification");
+				toast.error(response.message || "Failed to send balance notification");
 			}
 		} catch (error) {
 			console.error("Error sending balance notification:", error);
@@ -369,9 +369,9 @@ export default function UserBalances({
 								name="phone"
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Phone Number format ( +923452324442 )</FormLabel>
+										<FormLabel>Phone Number format ( +923422949447 )</FormLabel>
 										<FormControl>
-											<Input placeholder="+92 345 2324442" {...field} />
+											<Input placeholder="+92 342 2949447" {...field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>

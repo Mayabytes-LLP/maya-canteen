@@ -160,6 +160,12 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 									client_info: Record<string, unknown>;
 								};
 								setWhatsappStatus({
+									status: ["connected", "connecting", "disconnected"].includes(
+										status,
+									)
+										? (status as "connected" | "connecting" | "disconnected")
+										: "disconnected",
+									updatedAt: Date.now(),
 									connected: status === "connected",
 									message:
 										statusMessage ||
@@ -170,6 +176,8 @@ export const AppProvider: FC<Props> = ({ children, ...props }) => {
 								if (status === "connected") {
 									setWhatsappPairingCode(null);
 									toast.success(statusMessage || "WhatsApp connected");
+								} else if (status === "connecting") {
+									toast.info(statusMessage || "WhatsApp connecting...");
 								} else {
 									toast.error(statusMessage || "WhatsApp disconnected");
 								}

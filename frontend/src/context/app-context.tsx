@@ -9,6 +9,8 @@ export interface AppState {
 	whatsappStatus: {
 		connected: boolean;
 		message: string;
+		status?: "connected" | "connecting" | "disconnected";
+		updatedAt?: number;
 	};
 	whatsappClientInfo?: Record<string, unknown> | null;
 	setCurrentUser: (user: User | null) => void;

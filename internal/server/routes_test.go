@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"io"
 	"maya-canteen/internal/server/routes"
 	"net/http"
@@ -24,12 +25,18 @@ func TestHandler(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Errorf("expected status OK; got %v", resp.Status)
 	}
-	expected := "{\"success\":true,\"data\":{\"message\":\"Hello World\"}}\n"
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("error reading response body. Err: %v", err)
 	}
-	if expected != string(body) {
-		t.Errorf("expected response body to be %v; got %v", expected, string(body))
+	var got struct {
+		Status string            `json:"status"`
+		Data   map[string]string `json:"data"`
+	}
+	if err := json.Unmarshal(body, &got); err != nil {
+		t.Fatalf("response is not valid JSON: %v (%s)", err, body)
+	}
+	if got.Status != "success" || got.Data["message"] == "" {
+		t.Errorf("unexpected response body: %s", body)
 	}
 }

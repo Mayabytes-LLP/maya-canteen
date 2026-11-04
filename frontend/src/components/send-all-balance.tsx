@@ -221,7 +221,7 @@ export default function SendAllBalance() {
 									selectedYear,
 									includeTransactions,
 								);
-							} catch (err) {
+							} catch {
 								toast.error("Failed to send balance notifications");
 								return;
 							}

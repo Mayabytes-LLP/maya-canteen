@@ -5,7 +5,6 @@ import (
 	"maya-canteen/internal/gozk"
 	"maya-canteen/internal/handlers"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -13,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func GracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp handlers.WhatsAppClient, whatsappDbPath string, done chan bool) {
+func GracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, getWhatsApp func() handlers.WhatsAppClient, done chan bool) {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	<-ctx.Done()
@@ -24,33 +23,13 @@ func GracefulShutdown(apiServer *http.Server, zkSocket *gozk.ZK, whatsapp handle
 	log.Infoln("Disconnecting ZK device...")
 	zkSocket.Disconnect()
 	log.Infoln("ZK device disconnected")
-	if whatsapp != nil {
-		if whatsapp.IsConnected() {
-			log.Infoln("Logging out from WhatsApp...")
-			logoutCtx := context.Background()
-			err := whatsapp.Logout(logoutCtx)
-			if err != nil {
-				log.Errorf("Error logging out from WhatsApp: %v", err)
-			} else {
-				log.Infoln("WhatsApp logout successful")
-			}
-		} else {
-			log.Infoln("WhatsApp not connected, disconnecting...")
-			whatsapp.Disconnect()
-		}
+	// Only disconnect: logging out or deleting the store would unlink the device
+	// and force a QR re-scan after every restart.
+	if whatsapp := getWhatsApp(); whatsapp != nil {
+		log.Infoln("Disconnecting WhatsApp (session is kept for the next start)...")
+		whatsapp.Disconnect()
 	} else {
 		log.Infoln("WhatsApp client is nil, skipping disconnect")
-	}
-	log.Infof("Attempting to delete WhatsApp store file: %s", whatsappDbPath)
-	if _, err := os.Stat(whatsappDbPath); err == nil {
-		deleteErr := os.Remove(whatsappDbPath)
-		if deleteErr != nil {
-			log.Errorf("Error deleting WhatsApp store file: %v", deleteErr)
-		} else {
-			log.Infof("WhatsApp store file deleted successfully: %s", whatsappDbPath)
-		}
-	} else {
-		log.Infof("WhatsApp store file not found: %s", whatsappDbPath)
 	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
